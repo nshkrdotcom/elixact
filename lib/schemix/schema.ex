@@ -18,6 +18,18 @@ defmodule Schemix.Schema do
       def __schema__(:description), do: @schema_description
       def __schema__(:fields), do: @fields
       def __schema__(:config), do: @config
+
+      # Generate validation functions
+      def validate(data) do
+        Schemix.Validator.validate_schema(__MODULE__, data)
+      end
+
+      def validate!(data) do
+        case validate(data) do
+          {:ok, validated} -> validated
+          {:error, errors} -> raise Schemix.ValidationError, errors: errors
+        end
+      end
     end
   end
 
@@ -54,6 +66,12 @@ defmodule Schemix.Schema do
     end
   end
 
+  defmacro examples(values) when is_list(values) do
+    quote do
+      var!(field_meta) = Map.put(var!(field_meta), :examples, unquote(values))
+    end
+  end
+
   defmacro required(bool) do
     quote do
       var!(field_meta) = Map.put(var!(field_meta), :required, unquote(bool))
@@ -82,9 +100,21 @@ defmodule Schemix.Schema do
     end
   end
 
+  defp handle_type({:map, {key_type, value_type}}) do
+    quote do
+      Types.map(unquote(key_type), unquote(value_type))
+    end
+  end
+
   defp handle_type({:union, types}) do
     quote do
       Types.union(unquote(types))
+    end
+  end
+
+  defp handle_type({:__aliases__, _, _} = module_alias) do
+    quote do
+      unquote(module_alias)
     end
   end
 
@@ -100,8 +130,7 @@ defmodule Schemix.Schema do
       config = %{
         title: nil,
         description: nil,
-        strict: false,
-        json_encoders: %{}
+        strict: false
       }
 
       var!(config) = config
@@ -118,9 +147,45 @@ defmodule Schemix.Schema do
     end
   end
 
+  defmacro config_description(text) do
+    quote do
+      var!(config) = Map.put(var!(config), :description, unquote(text))
+    end
+  end
+
   defmacro strict(bool) do
     quote do
       var!(config) = Map.put(var!(config), :strict, unquote(bool))
+    end
+  end
+
+  defmacro __before_compile__(_env) do
+    quote do
+      def __schema__(:description), do: @schema_description
+      def __schema__(:fields), do: @fields
+      def __schema__(:validations), do: @validations
+      def __schema__(:config), do: @config
+
+      @doc """
+      Validates data against this schema.
+
+      Returns `{:ok, validated_data}` or `{:error, errors}`.
+      """
+      def validate(data) do
+        Schemix.Validator.validate_schema(__MODULE__, data)
+      end
+
+      @doc """
+      Validates data against this schema, raising on error.
+
+      Returns validated data or raises Schemix.ValidationError.
+      """
+      def validate!(data) do
+        case validate(data) do
+          {:ok, validated} -> validated
+          {:error, errors} -> raise Schemix.ValidationError, errors: errors
+        end
+      end
     end
   end
 end

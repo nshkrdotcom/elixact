@@ -1,4 +1,61 @@
 defmodule Schemix do
+  @moduledoc """
+  Schemix is a schema definition and validation library for Elixir.
+
+  It provides a DSL for defining schemas with rich metadata, validation rules,
+  and JSON Schema generation capabilities.
+
+  ## Example
+
+      defmodule UserSchema do
+        use Schemix
+
+        schema "User account information" do
+          field :name, :string do
+            description "User's full name"
+            example "John Doe"
+            required true
+            min_length 2
+          end
+
+          field :age, :integer do
+            description "User's age in years"
+            optional true
+            gt 0
+            lt 150
+          end
+
+          field :email, Types.Email do
+            description "User's email address"
+            required true
+          end
+
+          config do
+            title "User Schema"
+            strict true
+          end
+        end
+      end
+
+  The schema can then be used for validation and JSON Schema generation:
+
+      # Validation
+      {:ok, user} = UserSchema.validate(%{
+        name: "John Doe",
+        email: "john@example.com",
+        age: 30
+      })
+
+      # JSON Schema generation
+      json_schema = UserSchema.json_schema()
+  """
+
+  @doc """
+  Configures a module to be a Schemix schema.
+
+  This macro sets up the necessary module attributes and imports
+  the schema DSL functions.
+  """
   defmacro __using__(_opts) do
     quote do
       import Schemix.Schema

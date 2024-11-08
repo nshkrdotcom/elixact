@@ -3,6 +3,10 @@ defmodule Schemix.Type do
   Behaviour and macros for defining custom types.
   """
 
+  @callback type_definition() :: Schemix.Types.type_definition()
+  @callback json_schema() :: map()
+  @callback validate(term()) :: {:ok, term()} | {:error, term()}
+
   defmacro __using__(_opts) do
     quote do
       @behaviour Schemix.Type
@@ -19,7 +23,6 @@ defmodule Schemix.Type do
         end
       end
 
-      # Add the missing validate_type function
       defp validate_type(value) do
         type = type_definition()
         Schemix.Validator.validate(type, value)
@@ -50,8 +53,4 @@ defmodule Schemix.Type do
       defoverridable coerce_rule: 0, custom_rules: 0
     end
   end
-
-  @callback type_definition() :: Schemix.Types.type_definition()
-  @callback json_schema() :: map()
-  @callback validate(term()) :: {:ok, term()} | {:error, term()}
 end

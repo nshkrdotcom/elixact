@@ -1,37 +1,110 @@
 defmodule Schemix.Validator do
   @moduledoc """
-  Validates values against type definitions.
+  Validates values against type definitions and schemas.
   """
 
-  def validate({:ref, schema}, value) do
-    schema.validate(value)
+  alias Schemix.Error
+
+  def validate_schema(schema, data, path \\ []) when is_atom(schema) do
+    fields = schema.__schema__(:fields)
+    config = schema.__schema__(:config) || %{}
+
+    with :ok <- validate_required_fields(fields, data, path),
+         {:ok, validated} <- validate_fields(fields, data, path),
+         :ok <- validate_strict(config, validated, data, path) do
+      {:ok, validated}
+    end
   end
 
-  def validate(type, value) do
-    case type do
-      {:type, name, constraints} ->
-        with {:ok, validated} <- Schemix.Types.validate(name, value) do
-          apply_constraints(validated, constraints)
+  defp validate_required_fields(fields, data, path) do
+    required_fields = for {name, meta} <- fields, meta.required, do: name
+
+    case Enum.find(required_fields, &(not Map.has_key?(data, &1))) do
+      nil -> :ok
+      field -> {:error, Error.new([field | path], :required, "field is required")}
+    end
+  end
+
+  defp validate_fields(fields, data, path) do
+    Enum.reduce_while(fields, {:ok, %{}}, fn
+      {name, meta}, {:ok, acc} ->
+        field_path = [name | path]
+
+        case Map.fetch(data, name) do
+          {:ok, value} ->
+            case validate(meta.type, value, field_path) do
+              {:ok, validated} -> {:cont, {:ok, Map.put(acc, name, validated)}}
+              {:error, errors} -> {:halt, {:error, errors}}
+            end
+
+          :error ->
+            if meta.optional or not meta.required do
+              {:cont, {:ok, acc}}
+            else
+              {:halt, {:error, Error.new(field_path, :required, "field is required")}}
+            end
         end
+    end)
+  end
 
-      {:array, inner_type, constraints} ->
-        validate_array(value, inner_type, constraints)
+  defp validate_strict(%{strict: true}, validated, original, path) do
+    case Map.keys(original) -- Map.keys(validated) do
+      [] ->
+        :ok
 
-      {:map, {key_type, value_type}, constraints} ->
-        validate_map(value, key_type, value_type, constraints)
-
-      {:union, types, _constraints} ->
-        validate_union(value, types)
+      extra ->
+        {:error, Error.new(path, :additional_properties, "unknown fields: #{inspect(extra)}")}
     end
   end
 
-  defp apply_constraints(value, []), do: {:ok, value}
+  defp validate_strict(_, _, _, _), do: :ok
 
-  defp apply_constraints(value, [{constraint, constraint_value} | rest]) do
-    case apply_constraint(constraint, value, constraint_value) do
-      true -> apply_constraints(value, rest)
-      false -> {:error, "failed #{constraint} constraint"}
+  @doc """
+  Validates a value against a type definition.
+  """
+  def validate(type, value, path \\ [])
+
+  def validate({:ref, schema}, value, path) when is_atom(schema) do
+    case validate_schema(schema, value, path) do
+      {:ok, validated} -> {:ok, validated}
+      {:error, errors} -> {:error, errors}
     end
+  end
+
+  def validate({:type, name, constraints}, value, path) do
+    case Schemix.Types.validate(name, value) do
+      {:ok, validated} -> apply_constraints(validated, constraints, path)
+      {:error, error} -> {:error, %{error | path: path ++ error.path}}
+    end
+  end
+
+  def validate({:array, inner_type, constraints}, value, path) do
+    if is_list(value) do
+      validate_array_items(value, inner_type, constraints, path)
+    else
+      {:error, [Error.new(path, :type, "expected array, got #{inspect(value)}")]}
+    end
+  end
+
+  def validate({:map, {key_type, value_type}, constraints}, value, path) do
+    validate_map(value, key_type, value_type, constraints, path)
+  end
+
+  def validate({:union, types, _constraints}, value, path) do
+    validate_union(value, types, path)
+  end
+
+  defp apply_constraints(value, constraints, path) do
+    Enum.reduce_while(constraints, {:ok, value}, fn
+      {constraint, constraint_value}, {:ok, val} ->
+        case apply_constraint(constraint, val, constraint_value) do
+          true ->
+            {:cont, {:ok, val}}
+
+          false ->
+            {:halt, {:error, Error.new(path, constraint, "failed #{constraint} constraint")}}
+        end
+    end)
   end
 
   # String constraints
@@ -81,50 +154,68 @@ defmodule Schemix.Validator do
   end
 
   # Array validation
-  defp validate_array(value, _type, _constraints) when not is_list(value) do
-    {:error, "expected array, got #{inspect(value)}"}
-  end
+  defp validate_array_items(items, type, constraints, path) do
+    results =
+      items
+      |> Enum.with_index()
+      |> Enum.map(fn {item, idx} ->
+        item_path = path ++ [idx]
 
-  defp validate_array(value, type, constraints) do
-    results = Enum.map(value, &validate(type, &1))
-
-    if Enum.all?(results, &match?({:ok, _}, &1)) do
-      validated_array = Enum.map(results, fn {:ok, val} -> val end)
-      apply_constraints(validated_array, constraints)
-    else
-      {:error, "invalid array elements"}
-    end
-  end
-
-  # Map validation
-  defp validate_map(value, key_type, value_type, constraints) when is_map(value) do
-    key_results =
-      Enum.map(value, fn {k, v} ->
-        with {:ok, validated_key} <- validate(key_type, k),
-             {:ok, validated_value} <- validate(value_type, v) do
-          {:ok, {validated_key, validated_value}}
+        case validate(type, item, item_path) do
+          {:ok, validated} -> {:ok, validated}
+          {:error, errors} -> {:error, List.wrap(errors)}
         end
       end)
 
-    if Enum.all?(key_results, &match?({:ok, _}, &1)) do
-      validated_map = Map.new(Enum.map(key_results, fn {:ok, kv} -> kv end))
-      apply_constraints(validated_map, constraints)
-    else
-      {:error, "invalid map structure"}
+    case Enum.split_with(results, &match?({:ok, _}, &1)) do
+      {oks, []} ->
+        validated_array = Enum.map(oks, fn {:ok, val} -> val end)
+
+        case apply_constraints(validated_array, constraints, path) do
+          {:ok, final} -> {:ok, final}
+          {:error, error} -> {:error, [error]}
+        end
+
+      {_, errors} ->
+        {:error, Enum.flat_map(errors, fn {:error, errs} -> errs end)}
     end
   end
 
-  defp validate_map(value, _key_type, _value_type, _constraints) do
-    {:error, "expected map, got #{inspect(value)}"}
+  defp validate_map(value, key_type, value_type, constraints, path) when is_map(value) do
+    results =
+      Enum.map(value, fn {k, v} ->
+        with {:ok, validated_key} <- validate(key_type, k, path ++ [:key]),
+             {:ok, validated_value} <- validate(value_type, v, path ++ [validated_key]) do
+          {:ok, {validated_key, validated_value}}
+        else
+          {:error, errors} -> {:error, errors}
+        end
+      end)
+
+    case Enum.split_with(results, &match?({:ok, _}, &1)) do
+      {oks, []} ->
+        validated_map = Map.new(Enum.map(oks, fn {:ok, kv} -> kv end))
+
+        case apply_constraints(validated_map, constraints, path) do
+          {:ok, final} -> {:ok, final}
+          {:error, error} -> {:error, [error]}
+        end
+
+      {_, errors} ->
+        {:error, Enum.flat_map(errors, fn {:error, errs} -> List.wrap(errs) end)}
+    end
   end
 
-  # Union validation
-  defp validate_union(value, types) do
-    Enum.reduce_while(types, {:error, "no matching type"}, fn type, acc ->
-      case validate(type, value) do
-        {:ok, validated} -> {:halt, {:ok, validated}}
-        _ -> {:cont, acc}
-      end
-    end)
+  defp validate_map(value, _key_type, _value_type, _constraints, path) do
+    {:error, [Error.new(path, :type, "expected map, got #{inspect(value)}")]}
+  end
+
+  defp validate_union(value, types, path) do
+    results = Enum.map(types, &validate(&1, value, path))
+
+    case Enum.find(results, &match?({:ok, _}, &1)) do
+      {:ok, validated} -> {:ok, validated}
+      nil -> {:error, [Error.new(path, :type, "value did not match any type in union")]}
+    end
   end
 end

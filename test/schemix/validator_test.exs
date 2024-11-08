@@ -65,32 +65,58 @@ defmodule Schemix.ValidatorTest do
     test "validates array of strings" do
       type = Types.array(Types.string())
       assert {:ok, ["a", "b"]} = Validator.validate(type, ["a", "b"])
-      assert {:error, _} = Validator.validate(type, ["a", 1])
-      assert {:error, _} = Validator.validate(type, "not an array")
-    end
+      assert {:error, [error]} = Validator.validate(type, ["a", 1])
+      assert error.path == [1]
+      assert error.code == :type
 
-    test "validates array with constraints" do
-      type =
-        Types.array(Types.string())
-        |> Types.with_constraints([
-          {:min_items, 2},
-          {:max_items, 4}
-        ])
-
-      assert {:ok, ["a", "b"]} = Validator.validate(type, ["a", "b"])
-      assert {:ok, ["a", "b", "c"]} = Validator.validate(type, ["a", "b", "c"])
-      # too few
-      assert {:error, _} = Validator.validate(type, ["a"])
-      # too many
-      assert {:error, _} = Validator.validate(type, ["a", "b", "c", "d", "e"])
+      assert {:error, [error]} = Validator.validate(type, "not an array")
+      assert error.code == :type
+      assert error.path == []
     end
 
     test "validates nested arrays" do
       type = Types.array(Types.array(Types.integer()))
 
+      # Valid case
       assert {:ok, [[1, 2], [3, 4]]} = Validator.validate(type, [[1, 2], [3, 4]])
-      assert {:error, _} = Validator.validate(type, [[1, "2"], [3, 4]])
-      assert {:error, _} = Validator.validate(type, [1, 2, 3, 4])
+
+      # Invalid inner element
+      assert {:error, [error]} = Validator.validate(type, [[1, "2"], [3, 4]])
+      assert error.path == [0, 1]
+      assert error.code == :type
+
+      # Invalid outer elements (non-arrays)
+      assert {:error, errors} = Validator.validate(type, [1, 2, 3, 4])
+      assert length(errors) == 4
+
+      # Check first error
+      first_error = Enum.at(errors, 0)
+      assert first_error.path == [0]
+      assert first_error.code == :type
+      assert first_error.message =~ "expected array"
+
+      # Check all errors are about expecting arrays
+      for error <- errors do
+        assert error.code == :type
+        assert error.message =~ "expected array"
+      end
+    end
+
+    test "validates array with constraints" do
+      type =
+        Types.array(Types.string())
+        |> Types.with_constraints(min_items: 2, max_items: 4)
+
+      assert {:ok, ["a", "b"]} = Validator.validate(type, ["a", "b"])
+      assert {:ok, ["a", "b", "c"]} = Validator.validate(type, ["a", "b", "c"])
+
+      # too few items
+      assert {:error, [error]} = Validator.validate(type, ["a"])
+      assert error.code == :min_items
+
+      # too many items
+      assert {:error, [error]} = Validator.validate(type, ["a", "b", "c", "d", "e"])
+      assert error.code == :max_items
     end
   end
 
