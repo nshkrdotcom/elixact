@@ -9,11 +9,35 @@ defmodule Schemix.Types do
   def float, do: {:type, :float, []}
   def boolean, do: {:type, :boolean, []}
 
-  # Complex types
-  def array(type), do: {:array, type, []}
-  def map(key_type, value_type), do: {:map, {key_type, value_type}, []}
-  def union(types), do: {:union, types, []}
+  # Basic type constructor
+  def type(name) when is_atom(name) do
+    case name do
+      :string -> string()
+      :integer -> integer()
+      :float -> float()
+      :boolean -> boolean()
+      _ -> {:type, name, []}
+    end
+  end
 
+  # Complex types
+  def array(inner_type) when is_atom(inner_type) do
+    {:array, inner_type, []}
+  end
+
+  def array({:type, _, _} = inner_type), do: {:array, inner_type, []}
+  def array({:array, _, _} = inner_type), do: {:array, inner_type, []}
+  def array({:map, _, _} = inner_type), do: {:array, inner_type, []}
+  def array({:union, _, _} = inner_type), do: {:array, inner_type, []}
+
+  def map(key_type, value_type) do
+    key = if is_atom(key_type), do: type(key_type), else: key_type
+    value = if is_atom(value_type), do: type(value_type), else: value_type
+    {:map, {key, value}, []}
+  end
+
+  def union(types) when is_list(types), do: {:union, types, []}
+  # Type reference
   def ref(schema), do: {:ref, schema}
 
   # Add coercion helpers
