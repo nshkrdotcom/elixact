@@ -3,6 +3,10 @@ defmodule Schemix.Validator do
   Validates values against type definitions.
   """
 
+  def validate({:ref, schema}, value) do
+    schema.validate(value)
+  end
+
   def validate(type, value) do
     case type do
       {:type, name, constraints} ->
@@ -71,7 +75,8 @@ defmodule Schemix.Validator do
   end
 
   # Format constraint for strings
-  defp apply_constraint(:format, value, regex) when is_binary(value) do
+  defp apply_constraint(:format, value, regex)
+       when is_binary(value) and is_struct(regex, Regex) do
     Regex.match?(regex, value)
   end
 

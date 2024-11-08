@@ -8,7 +8,7 @@ defmodule Schemix.TypeTest do
       Schemix.Types.string()
       |> Schemix.Types.with_constraints([
         # Wrap regex in a list
-        {:format, [~r/^[^\s]+@[^\s]+$/]}
+        {:format, ~r/^[^\s]+@[^\s]+$/}
       ])
     end
 
@@ -30,7 +30,7 @@ defmodule Schemix.TypeTest do
     test "defines type correctly" do
       # Update assertion
       assert TestEmail.type_definition() ==
-               {:type, :string, [format: [~r/^[^\s]+@[^\s]+$/]]}
+               {:type, :string, [format: ~r/^[^\s]+@[^\s]+$/]}
     end
 
     test "generates correct JSON schema" do

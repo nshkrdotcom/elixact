@@ -14,6 +14,28 @@ defmodule Schemix.Types do
   def map(key_type, value_type), do: {:map, {key_type, value_type}, []}
   def union(types), do: {:union, types, []}
 
+  def ref(schema), do: {:ref, schema}
+
+  # Add coercion helpers
+  def coerce(:string, value) when is_integer(value), do: {:ok, Integer.to_string(value)}
+  def coerce(:string, value) when is_float(value), do: {:ok, Float.to_string(value)}
+
+  def coerce(:integer, value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, ""} -> {:ok, int}
+      _ -> {:error, "invalid integer format"}
+    end
+  end
+
+  def coerce(:float, value) when is_binary(value) do
+    case Float.parse(value) do
+      {float, ""} -> {:ok, float}
+      _ -> {:error, "invalid float format"}
+    end
+  end
+
+  def coerce(_, value), do: {:error, "cannot coerce #{inspect(value)}"}
+
   # Type modifiers
   def optional(type), do: {:optional, type}
   def required(type), do: {:required, type}

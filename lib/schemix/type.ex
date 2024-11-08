@@ -8,30 +8,50 @@ defmodule Schemix.Type do
       @behaviour Schemix.Type
       import Schemix.Types
 
+      Module.register_attribute(__MODULE__, :type_metadata, accumulate: true)
+
+      def metadata, do: @type_metadata
+
       def validate(value) do
-        validate_type(type_definition(), value)
-      end
-
-      defp validate_type({:type, type_name, constraints}, value) do
-        with {:ok, value} <- Schemix.Types.validate(type_name, value) do
-          validate_constraints(value, constraints)
+        with {:ok, coerced} <- maybe_coerce(value),
+             {:ok, validated} <- validate_type(coerced) do
+          validate_custom_rules(validated)
         end
       end
 
-      defp validate_constraints(value, []), do: {:ok, value}
+      # Add the missing validate_type function
+      defp validate_type(value) do
+        type = type_definition()
+        Schemix.Validator.validate(type, value)
+      end
 
-      defp validate_constraints(value, [{constraint, args} | rest]) do
-        # Ensure args is always a list
-        args_list = List.wrap(args)
-
-        case apply(__MODULE__, constraint, [value | args_list]) do
-          true -> validate_constraints(value, rest)
-          false -> {:error, "failed #{constraint} constraint"}
+      defp maybe_coerce(value) do
+        case coerce_rule() do
+          nil -> {:ok, value}
+          rule when is_function(rule) -> rule.(value)
+          {module, function} -> apply(module, function, [value])
         end
       end
+
+      defp validate_custom_rules(value) do
+        Enum.reduce_while(custom_rules(), {:ok, value}, fn rule, {:ok, val} ->
+          case apply(__MODULE__, rule, [val]) do
+            true -> {:cont, {:ok, val}}
+            false -> {:halt, {:error, "failed custom rule: #{rule}"}}
+            {:error, reason} -> {:halt, {:error, reason}}
+          end
+        end)
+      end
+
+      # Default implementations that can be overridden
+      def coerce_rule, do: nil
+      def custom_rules, do: []
+
+      defoverridable coerce_rule: 0, custom_rules: 0
     end
   end
 
   @callback type_definition() :: Schemix.Types.type_definition()
   @callback json_schema() :: map()
+  @callback validate(term()) :: {:ok, term()} | {:error, term()}
 end
