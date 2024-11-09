@@ -101,10 +101,10 @@ defmodule Schemix.JsonSchema do
     # Handle examples
     base =
       cond do
-        examples = field_meta[:examples] ->
+        examples = field_meta.examples ->
           Map.put(base, "examples", examples)
 
-        example = field_meta[:example] ->
+        example = field_meta.example ->
           Map.put(base, "examples", [example])
 
         true ->
