@@ -173,7 +173,10 @@ defmodule Schemix.Schema do
 
   defmacro required(bool) do
     quote do
-      var!(field_meta) = Map.put(var!(field_meta), :required, unquote(bool))
+      var!(field_meta) =
+        var!(field_meta)
+        |> Map.put(:required, unquote(bool))
+        |> Map.put(:optional, not unquote(bool))
     end
   end
 
