@@ -33,23 +33,122 @@ defmodule Schemix.Schema do
     end
   end
 
+  defmacro min_length(value) do
+    quote do
+      current_constraints = Map.get(var!(field_meta), :constraints, [])
+
+      var!(field_meta) =
+        Map.put(var!(field_meta), :constraints, [
+          {:min_length, unquote(value)} | current_constraints
+        ])
+    end
+  end
+
+  defmacro max_length(value) do
+    quote do
+      current_constraints = Map.get(var!(field_meta), :constraints, [])
+
+      var!(field_meta) =
+        Map.put(var!(field_meta), :constraints, [
+          {:max_length, unquote(value)} | current_constraints
+        ])
+    end
+  end
+
+  defmacro min_items(value) do
+    quote do
+      current_constraints = Map.get(var!(field_meta), :constraints, [])
+
+      var!(field_meta) =
+        Map.put(var!(field_meta), :constraints, [
+          {:min_items, unquote(value)} | current_constraints
+        ])
+    end
+  end
+
+  defmacro max_items(value) do
+    quote do
+      current_constraints = Map.get(var!(field_meta), :constraints, [])
+
+      var!(field_meta) =
+        Map.put(var!(field_meta), :constraints, [
+          {:max_items, unquote(value)} | current_constraints
+        ])
+    end
+  end
+
+  defmacro gt(value) do
+    quote do
+      current_constraints = Map.get(var!(field_meta), :constraints, [])
+
+      var!(field_meta) =
+        Map.put(var!(field_meta), :constraints, [{:gt, unquote(value)} | current_constraints])
+    end
+  end
+
+  defmacro lt(value) do
+    quote do
+      current_constraints = Map.get(var!(field_meta), :constraints, [])
+
+      var!(field_meta) =
+        Map.put(var!(field_meta), :constraints, [{:lt, unquote(value)} | current_constraints])
+    end
+  end
+
+  defmacro gteq(value) do
+    quote do
+      current_constraints = Map.get(var!(field_meta), :constraints, [])
+
+      var!(field_meta) =
+        Map.put(var!(field_meta), :constraints, [{:gteq, unquote(value)} | current_constraints])
+    end
+  end
+
+  defmacro lteq(value) do
+    quote do
+      current_constraints = Map.get(var!(field_meta), :constraints, [])
+
+      var!(field_meta) =
+        Map.put(var!(field_meta), :constraints, [{:lteq, unquote(value)} | current_constraints])
+    end
+  end
+
+  defmacro format(value) do
+    quote do
+      current_constraints = Map.get(var!(field_meta), :constraints, [])
+
+      var!(field_meta) =
+        Map.put(var!(field_meta), :constraints, [{:format, unquote(value)} | current_constraints])
+    end
+  end
+
+  # Field macro remains the same
   defmacro field(name, type, do: block) do
     quote do
-      field_meta = %{
+      field_meta = %Schemix.FieldMeta{
         name: unquote(name),
         type: unquote(handle_type(type)),
-        description: nil,
-        example: nil,
-        required: false,
-        optional: false,
-        default: nil,
         constraints: []
       }
 
       var!(field_meta) = field_meta
       unquote(block)
 
-      @fields {unquote(name), var!(field_meta)}
+      # Apply constraints to the type
+      final_type =
+        case var!(field_meta).type do
+          {:type, type_name, _} ->
+            {:type, type_name, var!(field_meta).constraints}
+
+          {kind, inner, _} ->
+            {kind, inner, var!(field_meta).constraints}
+
+          other ->
+            other
+        end
+
+      final_meta = Map.put(var!(field_meta), :type, final_type)
+      @fields {unquote(name), final_meta}
     end
   end
 
@@ -100,12 +199,14 @@ defmodule Schemix.Schema do
     end
   end
 
+  # Handle map types
   defp handle_type({:map, {key_type, value_type}}) do
     quote do
       Types.map(unquote(key_type), unquote(value_type))
     end
   end
 
+  # Handle union types
   defp handle_type({:union, types}) do
     quote do
       Types.union(unquote(types))
@@ -118,9 +219,16 @@ defmodule Schemix.Schema do
     end
   end
 
-  defp handle_type(type) when is_atom(type) do
-    quote do
-      Types.type(unquote(type))
+  # Handle module references and other atoms
+  defp handle_type(module) when is_atom(module) do
+    cond do
+      Code.ensure_loaded?(module) && function_exported?(module, :__schema__, 1) ->
+        {:ref, module}
+
+      true ->
+        quote do
+          Types.type(unquote(module))
+        end
     end
   end
 
