@@ -191,7 +191,10 @@ defmodule Schemix.Schema do
 
   defmacro default(value) do
     quote do
-      var!(field_meta) = Map.put(var!(field_meta), :default, unquote(value))
+      var!(field_meta) = 
+        var!(field_meta)
+        |> Map.put(:default, unquote(value))
+        |> Map.put(:optional, true)
     end
   end
 
