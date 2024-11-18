@@ -138,10 +138,10 @@ defmodule Schemix.Schema do
       final_type =
         case var!(field_meta).type do
           {:type, type_name, _} ->
-            {:type, type_name, var!(field_meta).constraints}
+            {:type, type_name, Enum.reverse(var!(field_meta).constraints)}
 
           {kind, inner, _} ->
-            {kind, inner, var!(field_meta).constraints}
+            {kind, inner, Enum.reverse(var!(field_meta).constraints)}
 
           other ->
             other

@@ -98,8 +98,8 @@ defmodule Schemix.Types do
   end
 
   def map(key_type, value_type) do
-    key = if is_atom(key_type), do: type(key_type), else: key_type
-    value = if is_atom(value_type), do: type(value_type), else: value_type
+    key = if is_atom(key_type) and not schema_module?(key_type), do: type(key_type), else: key_type
+    value = if is_atom(value_type) and not schema_module?(value_type), do: type(value_type), else: value_type
     {:map, {key, value}, []}
   end
 

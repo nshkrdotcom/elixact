@@ -114,6 +114,7 @@ defmodule Schemix.JsonSchema.TypeMapper do
   defp map_basic_type(:integer), do: %{"type" => "integer"}
   defp map_basic_type(:float), do: %{"type" => "number"}
   defp map_basic_type(:boolean), do: %{"type" => "boolean"}
+  defp map_basic_type(module) when is_atom(module), do: %{"$ref" => "#/definitions/#{module_name(module)}"}
 
   # Array type mapping
   defp map_array_type(inner_type, constraints, store) do
