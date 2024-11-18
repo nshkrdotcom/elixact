@@ -41,7 +41,7 @@ defmodule Schemix.Validator do
             cond do
               Map.has_key?(meta, :default) ->
                 {:cont, {:ok, Map.put(acc, name, meta.default)}}
-              meta.optional || meta.required == false ->
+              meta.optional == true || meta.required == false ->
                 {:cont, {:ok, acc}}
               true ->
                 {:halt, {:error, Error.new(field_path, :required, "field is required")}}
