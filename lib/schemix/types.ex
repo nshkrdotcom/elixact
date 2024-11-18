@@ -61,18 +61,36 @@ defmodule Schemix.Types do
   end
 
   # Complex types
-  def array(inner_type) when is_atom(inner_type) do
-    if schema_module?(inner_type) do
-      {:array, {:ref, inner_type}, []}
-    else
-      {:array, inner_type, []}
+  def array(inner_type) do
+    cond do
+      is_atom(inner_type) && schema_module?(inner_type) ->
+        {:array, {:ref, inner_type}, []}
+      is_atom(inner_type) ->
+        {:array, {:type, inner_type, []}, []}
+      is_tuple(inner_type) ->
+        case inner_type do
+          {:type, _, _} -> {:array, inner_type, []}
+          {:array, _, _} -> {:array, inner_type, []}
+          {:map, _, _} -> {:array, inner_type, []}
+          {:union, _, _} -> {:array, inner_type, []}
+          {:map, {key_type, value_type}} -> 
+            {:array, {:map, {key_type, value_type}, []}, []}
+          _ -> {:array, normalize_type(inner_type), []}
+        end
     end
   end
 
-  def array({:type, _, _} = inner_type), do: {:array, inner_type, []}
-  def array({:array, _, _} = inner_type), do: {:array, inner_type, []}
-  def array({:map, _, _} = inner_type), do: {:array, inner_type, []}
-  def array({:union, _, _} = inner_type), do: {:array, inner_type, []}
+  # Helper to normalize type definitions
+  defp normalize_type({:map, {key_type, value_type}}) do
+    {:map, {normalize_type(key_type), normalize_type(value_type)}, []}
+  end
+  defp normalize_type({:union, types}) when is_list(types) do
+    {:union, Enum.map(types, &normalize_type/1), []}
+  end
+  defp normalize_type(type) when is_atom(type) do
+    {:type, type, []}
+  end
+  defp normalize_type(other), do: other
 
   # Helper function to check if module is a schema
   defp schema_module?(module) do
