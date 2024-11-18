@@ -26,4 +26,6 @@ schemix-*.tar
 /tmp/
 
 .elixir_ls/
-drops/
+#drops/
+.aider*
+.env
