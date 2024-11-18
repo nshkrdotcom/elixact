@@ -193,4 +193,30 @@ defmodule Schemix.SchemaTest do
       assert {:error, "passwords must match"} = ValidationSchema.validate_passwords(invalid_data)
     end
   end
+
+  describe "default values" do
+    defmodule DefaultSchema do
+      use Schemix
+
+      schema do
+        field :name, :string do
+          required(true)
+        end
+
+        field :status, :string do
+          default("active")
+        end
+      end
+    end
+
+    test "field with default value is optional" do
+      valid_data = %{
+        name: "test"
+      }
+
+      assert {:ok, validated} = DefaultSchema.validate(valid_data)
+      assert validated.status == "active"
+      assert DefaultSchema.__schema__(:fields) |> Enum.find(fn {name, _} -> name == :status end) |> elem(1).optional == true
+    end
+  end
 end
