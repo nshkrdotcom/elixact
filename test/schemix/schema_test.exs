@@ -214,13 +214,19 @@ defmodule Schemix.SchemaTest do
         name: "test"
       }
 
+      # Validate the data
       assert {:ok, validated} = DefaultSchema.validate(valid_data)
       assert validated.status == "active"
       
-      # Get field metadata and verify optional status
+      # Get field metadata
       fields = DefaultSchema.__schema__(:fields)
-      {_, status_meta} = Enum.find(fields, fn {name, _} -> name == :status end)
+      status_field = Enum.find(fields, fn {name, _} -> name == :status end)
+      assert status_field != nil
+      
+      # Verify optional status
+      {_, status_meta} = status_field
       assert status_meta.optional == true
+      assert status_meta.default == "active"
     end
   end
 end
