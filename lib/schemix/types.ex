@@ -62,22 +62,8 @@ defmodule Schemix.Types do
 
   # Complex types
   def array(inner_type) do
-    cond do
-      is_atom(inner_type) && schema_module?(inner_type) ->
-        {:array, {:ref, inner_type}, []}
-      is_atom(inner_type) ->
-        {:array, {:type, inner_type, []}, []}
-      is_tuple(inner_type) ->
-        case inner_type do
-          {:type, _, _} -> {:array, inner_type, []}
-          {:array, _, _} -> {:array, inner_type, []}
-          {:map, _, _} -> {:array, inner_type, []}
-          {:union, _, _} -> {:array, inner_type, []}
-          {:map, {key_type, value_type}} -> 
-            {:array, {:map, {key_type, value_type}, []}, []}
-          _ -> {:array, normalize_type(inner_type), []}
-        end
-    end
+    normalized = normalize_type(inner_type)
+    {:array, normalized, []}
   end
 
   # Helper to normalize type definitions
@@ -98,9 +84,9 @@ defmodule Schemix.Types do
   end
 
   def map(key_type, value_type) do
-    key = if is_atom(key_type) and not schema_module?(key_type), do: type(key_type), else: key_type
-    value = if is_atom(value_type) and not schema_module?(value_type), do: type(value_type), else: value_type
-    {:map, {key, value}, []}
+    normalized_key = normalize_type(key_type)
+    normalized_value = normalize_type(value_type)
+    {:map, {normalized_key, normalized_value}, []}
   end
 
   def union(types) when is_list(types), do: {:union, types, []}
