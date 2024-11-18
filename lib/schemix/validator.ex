@@ -38,7 +38,7 @@ defmodule Schemix.Validator do
             end
 
           :error ->
-            if meta.optional or not meta.required do
+            if meta.optional || meta.required == false do
               {:cont, {:ok, acc}}
             else
               {:halt, {:error, Error.new(field_path, :required, "field is required")}}

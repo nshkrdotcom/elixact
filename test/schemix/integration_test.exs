@@ -92,7 +92,7 @@ defmodule Schemix.IntegrationTest do
         optional true
       end
 
-      field :settings, {:map, {:string, {:union, [:string, :boolean, :integer]}}} do
+      field :settings, {:map, {:atom, {:union, [:string, :boolean, :integer]}}} do
         description "User settings"
         optional true
       end
@@ -184,7 +184,8 @@ defmodule Schemix.IntegrationTest do
 
       assert {:error, errors} = UserSchema.validate(invalid_data)
       errors = List.wrap(errors)
-      assert length(errors) == 2
+      errors = List.wrap(errors)
+      assert Enum.count(errors) == 2
     end
 
     test "rejects additional properties when strict" do
