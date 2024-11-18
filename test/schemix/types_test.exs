@@ -25,6 +25,11 @@ defmodule Schemix.TypesTest do
       assert Types.array(Types.string()) == {:array, {:type, :string, []}, []}
     end
 
+    test "array of array of strings" do
+      assert Types.array(Types.array(Types.string())) ==
+               {:array, {:array, {:type, :string, []}, []}, []}
+    end
+
     test "map type" do
       assert Types.map(Types.string(), Types.integer()) ==
                {:map, {{:type, :string, []}, {:type, :integer, []}}, []}
@@ -33,6 +38,18 @@ defmodule Schemix.TypesTest do
     test "union type" do
       assert Types.union([Types.string(), Types.integer()]) ==
                {:union, [{:type, :string, []}, {:type, :integer, []}], []}
+    end
+
+    test "union of string and array of maps" do
+      assert Types.union([
+               Types.string(),
+               Types.array(Types.map(Types.string(), Types.integer()))
+             ]) ==
+               {:union,
+                [
+                  {:type, :string, []},
+                  {:array, {:map, {{:type, :string, []}, {:type, :integer, []}}, []}, []}
+                ], []}
     end
   end
 
