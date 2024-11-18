@@ -204,8 +204,10 @@ defmodule Schemix.Schema do
 
   # Handle map types
   defp handle_type({:map, {key_type, value_type}}) do
+    normalized_key = handle_type(key_type)
+    normalized_value = handle_type(value_type)
     quote do
-      Types.map(unquote(key_type), unquote(value_type))
+      Types.map(unquote(normalized_key), unquote(normalized_value))
     end
   end
 
