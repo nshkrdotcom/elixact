@@ -99,7 +99,7 @@ defmodule Schemix.IntegrationTest do
 
       config do
         title "User Schema"
-        description "Complete user profile schema"
+        config_description "Complete user profile schema"
         strict true
       end
     end
@@ -121,9 +121,9 @@ defmodule Schemix.IntegrationTest do
           country: "USA"
         },
         settings: %{
-          "theme" => "dark",
-          "notifications" => true,
-          "max_items" => 100
+          theme: "dark",
+          notifications: true,
+          max_items: 100
         }
       }
 
@@ -183,6 +183,7 @@ defmodule Schemix.IntegrationTest do
       }
 
       assert {:error, errors} = UserSchema.validate(invalid_data)
+      errors = List.wrap(errors)
       assert length(errors) == 2
     end
 
