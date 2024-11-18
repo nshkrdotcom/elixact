@@ -78,11 +78,6 @@ defmodule Schemix.Types do
   end
   defp normalize_type(other), do: other
 
-  # Helper function to check if module is a schema
-  defp schema_module?(module) do
-    Code.ensure_loaded?(module) and function_exported?(module, :__schema__, 1)
-  end
-
   def map(key_type, value_type) do
     normalized_key = normalize_type(key_type)
     normalized_value = normalize_type(value_type)
