@@ -139,7 +139,7 @@ defmodule Schemix.SchemaTest do
                 []}
 
       assert settings_meta.type ==
-               {:map, {:atom, {:union, [:string, :boolean, {:array, :integer}]}}, []}
+               {:map, {{:type, :atom, []}, {:union, [:string, :boolean, {:array, :integer}], []}}, []}
 
       assert meta_meta.optional == true
       assert settings_meta.required == true
