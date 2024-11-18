@@ -105,7 +105,11 @@ defmodule Schemix.SchemaTest do
       {:tags, tags_meta} = Enum.find(fields, fn {name, _} -> name == :tags end)
 
       assert tags_meta.type ==
-               {:array, {:map, {:string, {:union, [:string, :integer]}}},
+               {:array,
+                {:map,
+                 {{:type, :string, []},
+                  {:union, [{:type, :string, []}, {:type, :integer, []}], []}},
+                 []},
                 [min_items: 1, max_items: 10]}
 
       assert tags_meta.default == []
@@ -126,7 +130,13 @@ defmodule Schemix.SchemaTest do
       {:metadata, meta_meta} = Enum.find(fields, fn {name, _} -> name == :metadata end)
       {:settings, settings_meta} = Enum.find(fields, fn {name, _} -> name == :settings end)
 
-      assert meta_meta.type == {:map, {:string, {:array, {:map, {:string, :any}}}}, []}
+      assert meta_meta.type ==
+               {:map,
+                {{:type, :string, []},
+                 {:array,
+                  {:map, {{:type, :string, []}, {:type, :any, []}}, []},
+                  []}},
+                []}
 
       assert settings_meta.type ==
                {:map, {:atom, {:union, [:string, :boolean, {:array, :integer}]}}, []}
