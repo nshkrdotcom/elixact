@@ -80,7 +80,12 @@ defmodule Schemix.Types do
       :float -> {:type, :float, []}
       :boolean -> {:type, :boolean, []}
       :any -> {:type, :any, []}
-      _ when Code.ensure_loaded?(type) and function_exported?(type, :__schema__, 1) -> type
+      _ -> 
+        if Code.ensure_loaded?(type) and function_exported?(type, :__schema__, 1) do
+          type
+        else
+          {:type, type, []}
+        end
       _ -> {:type, type, []}
     end
   end
