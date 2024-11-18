@@ -74,7 +74,15 @@ defmodule Schemix.Types do
     {:union, Enum.map(types, &normalize_type/1), []}
   end
   defp normalize_type(type) when is_atom(type) do
-    {:type, type, []}
+    case type do
+      :string -> {:type, :string, []}
+      :integer -> {:type, :integer, []}
+      :float -> {:type, :float, []}
+      :boolean -> {:type, :boolean, []}
+      :any -> {:type, :any, []}
+      _ when Code.ensure_loaded?(type) and function_exported?(type, :__schema__, 1) -> type
+      _ -> {:type, type, []}
+    end
   end
   defp normalize_type(other), do: other
 

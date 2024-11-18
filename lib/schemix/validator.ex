@@ -65,9 +65,14 @@ defmodule Schemix.Validator do
   def validate(type, value, path \\ [])
 
   def validate({:ref, schema}, value, path) when is_atom(schema) do
-    case validate_schema(schema, value, path) do
-      {:ok, validated} -> {:ok, validated}
-      {:error, errors} -> {:error, errors}
+    validate_schema(schema, value, path)
+  end
+
+  def validate(schema, value, path) when is_atom(schema) and Code.ensure_loaded?(schema) do
+    if function_exported?(schema, :__schema__, 1) do
+      validate_schema(schema, value, path)
+    else
+      {:error, Error.new(path, :type, "#{inspect(value)} is not a valid #{inspect(schema)}")}
     end
   end
 
