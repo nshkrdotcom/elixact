@@ -1,13 +1,13 @@
-defmodule Schemix.IntegrationTest do
+defmodule Elixact.IntegrationTest do
   use ExUnit.Case, async: true
 
   # Custom Email type for testing
   defmodule EmailType do
-    use Schemix.Type
+    use Elixact.Type
 
     def type_definition do
-      Schemix.Types.string()
-      |> Schemix.Types.with_constraints([
+      Elixact.Types.string()
+      |> Elixact.Types.with_constraints([
         {:format, ~r/^[^\s]+@[^\s]+$/}
       ])
     end
@@ -23,7 +23,7 @@ defmodule Schemix.IntegrationTest do
 
   # Address schema for nested schema testing
   defmodule AddressSchema do
-    use Schemix
+    use Elixact
 
     schema "Address information" do
       field :street, :string do
@@ -45,7 +45,7 @@ defmodule Schemix.IntegrationTest do
 
   # Main test schema with various field types and validations
   defmodule UserSchema do
-    use Schemix
+    use Elixact
 
     schema "User account information" do
       field :email, EmailType do
@@ -178,7 +178,7 @@ defmodule Schemix.IntegrationTest do
 
       assert {:error, error} = UserSchema.validate(invalid_data)
 
-      assert error == %Schemix.Error{
+      assert error == %Elixact.Error{
                path: [:address, :postal_code],
                code: :format,
                message: "failed format constraint"
@@ -200,7 +200,7 @@ defmodule Schemix.IntegrationTest do
 
   describe "string keys support" do
     defmodule StringKeysSchema do
-      use Schemix
+      use Elixact
 
       schema do
         field :name, :string do
@@ -262,7 +262,7 @@ defmodule Schemix.IntegrationTest do
 
   describe "JSON Schema generation" do
     test "generates valid JSON Schema" do
-      schema = Schemix.JsonSchema.from_schema(UserSchema)
+      schema = Elixact.JsonSchema.from_schema(UserSchema)
 
       assert schema["title"] == "User Schema"
       assert schema["type"] == "object"

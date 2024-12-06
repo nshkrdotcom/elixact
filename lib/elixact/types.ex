@@ -1,6 +1,6 @@
-defmodule Schemix.Types do
+defmodule Elixact.Types do
   @moduledoc """
-  Core type system for Schemix schemas.
+  Core type system for Elixact schemas.
 
   Provides functions for defining and working with types:
   - Basic types (:string, :integer, :float, :boolean)
@@ -48,7 +48,7 @@ defmodule Schemix.Types do
           | {:union, [type_definition], [any()]}
           | {:ref, atom()}
 
-  alias Schemix.Error
+  alias Elixact.Error
 
   # Basic types
   def string, do: {:type, :string, []}

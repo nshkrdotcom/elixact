@@ -1,9 +1,9 @@
-defmodule Schemix.MixProject do
+defmodule Elixact.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :schemix,
+      app: :elixact,
       version: "0.1.0",
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
@@ -16,7 +16,7 @@ defmodule Schemix.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {Schemix.Application, []}
+      mod: {Elixact.Application, []}
     ]
   end
 
@@ -31,9 +31,9 @@ defmodule Schemix.MixProject do
 
   defp package do
     [
-      name: "schemix",
+      name: "elixact",
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/LiboShen/schemix"}
+      links: %{"GitHub" => "https://github.com/LiboShen/elixact"}
     ]
   end
 end

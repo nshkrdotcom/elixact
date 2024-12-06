@@ -1,6 +1,6 @@
-defmodule Schemix do
+defmodule Elixact do
   @moduledoc """
-  Schemix is a schema definition and validation library for Elixir.
+  Elixact is a schema definition and validation library for Elixir.
 
   It provides a DSL for defining schemas with rich metadata, validation rules,
   and JSON Schema generation capabilities.
@@ -8,7 +8,7 @@ defmodule Schemix do
   ## Example
 
       defmodule UserSchema do
-        use Schemix
+        use Elixact
 
         schema "User account information" do
           field :name, :string do
@@ -51,14 +51,14 @@ defmodule Schemix do
   """
 
   @doc """
-  Configures a module to be a Schemix schema.
+  Configures a module to be a Elixact schema.
 
   This macro sets up the necessary module attributes and imports
   the schema DSL functions.
   """
   defmacro __using__(_opts) do
     quote do
-      import Schemix.Schema
+      import Elixact.Schema
 
       # Register accumulating attributes
       Module.register_attribute(__MODULE__, :schema_description, [])
@@ -66,7 +66,7 @@ defmodule Schemix do
       Module.register_attribute(__MODULE__, :validations, accumulate: true)
       Module.register_attribute(__MODULE__, :config, [])
 
-      @before_compile Schemix
+      @before_compile Elixact
     end
   end
 

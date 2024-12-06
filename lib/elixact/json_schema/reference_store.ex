@@ -1,4 +1,4 @@
-defmodule Schemix.JsonSchema.ReferenceStore do
+defmodule Elixact.JsonSchema.ReferenceStore do
   @moduledoc """
   Manages schema references and definitions for JSON Schema generation.
   """

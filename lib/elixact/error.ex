@@ -1,6 +1,6 @@
-defmodule Schemix.Error do
+defmodule Elixact.Error do
   @moduledoc """
-  Structured error representation for Schemix validation errors.
+  Structured error representation for Elixact validation errors.
   """
 
   @type t :: %__MODULE__{

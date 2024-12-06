@@ -1,6 +1,8 @@
-# Schemix
+# Elixact
 
-Schemix is a schema definition and validation library for Elixir with JSON Schema support.
+Elixact is a schema definition and validation library for Elixir with JSON Schema support.
+
+Similar to Pydantic in Python.
 
 ## Features
 
@@ -14,12 +16,12 @@ Schemix is a schema definition and validation library for Elixir with JSON Schem
 
 ## Installation
 
-Add `schemix` to your list of dependencies in `mix.exs`:
+Add `elixact` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:schemix, "~> 0.1.0"}
+    {:elixact, "~> 0.1.0"}
   ]
 end
 ```
@@ -30,7 +32,7 @@ end
 
 ```elixir
 defmodule UserSchema do
-  use Schemix
+  use Elixact
 
   schema "User account information" do
     field :name, :string do
@@ -91,7 +93,7 @@ json = Jason.encode!(json_schema)
 
 ```elixir
 defmodule Types.Email do
-  use Schemix.Type
+  use Elixact.Type
 
   def type_definition do
     Types.string()
@@ -112,7 +114,7 @@ end
 
 ## Documentation
 
-Full documentation can be found at [https://hexdocs.pm/schemix](https://hexdocs.pm/schemix).
+Full documentation can be found at [https://hexdocs.pm/elixact](https://hexdocs.pm/elixact).
 
 ## License
 

@@ -1,7 +1,7 @@
-defmodule Schemix.JsonSchema.TypeMapperTest do
+defmodule Elixact.JsonSchema.TypeMapperTest do
   use ExUnit.Case, async: true
-  alias Schemix.JsonSchema.TypeMapper
-  alias Schemix.Types
+  alias Elixact.JsonSchema.TypeMapper
+  alias Elixact.Types
 
   describe "basic types" do
     test "maps string type" do

@@ -1,6 +1,6 @@
-defmodule Schemix.TypesTest do
+defmodule Elixact.TypesTest do
   use ExUnit.Case, async: true
-  alias Schemix.Types
+  alias Elixact.Types
 
   describe "basic types" do
     test "string type" do

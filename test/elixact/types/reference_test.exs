@@ -1,9 +1,9 @@
-defmodule Schemix.Types.ReferenceTest do
+defmodule Elixact.Types.ReferenceTest do
   use ExUnit.Case, async: true
-  alias Schemix.{Types, Validator}
+  alias Elixact.{Types, Validator}
 
   defmodule AddressSchema do
-    use Schemix
+    use Elixact
 
     schema "Address information" do
       field :street, :string do

@@ -1,4 +1,4 @@
-defmodule Schemix.FieldMeta do
+defmodule Elixact.FieldMeta do
   @moduledoc """
   Struct for field metadata
   """

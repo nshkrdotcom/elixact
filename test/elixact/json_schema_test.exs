@@ -1,9 +1,9 @@
-defmodule Schemix.JsonSchemaTest do
+defmodule Elixact.JsonSchemaTest do
   use ExUnit.Case, async: true
 
   describe "basic schema conversion" do
     defmodule MetadataSchema do
-      use Schemix
+      use Elixact
 
       schema "Schema with rich metadata" do
         field :name, :string do
@@ -51,13 +51,13 @@ defmodule Schemix.JsonSchemaTest do
         "required" => ["name"]
       }
 
-      assert Schemix.JsonSchema.from_schema(MetadataSchema) == expected
+      assert Elixact.JsonSchema.from_schema(MetadataSchema) == expected
     end
   end
 
   describe "schema configuration" do
     defmodule ConfiguredSchema do
-      use Schemix
+      use Elixact
 
       schema "Configured schema" do
         field :name, :string do
@@ -93,17 +93,17 @@ defmodule Schemix.JsonSchemaTest do
         "required" => ["name"]
       }
 
-      assert Schemix.JsonSchema.from_schema(ConfiguredSchema) == expected
+      assert Elixact.JsonSchema.from_schema(ConfiguredSchema) == expected
     end
   end
 
   describe "custom type handling" do
     defmodule EmailType do
-      use Schemix.Type
+      use Elixact.Type
 
       def type_definition do
-        Schemix.Types.string()
-        |> Schemix.Types.with_constraints([
+        Elixact.Types.string()
+        |> Elixact.Types.with_constraints([
           {:format, ~r/^[^\s]+@[^\s]+$/}
         ])
       end
@@ -118,7 +118,7 @@ defmodule Schemix.JsonSchemaTest do
     end
 
     defmodule SchemaWithCustomTypes do
-      use Schemix
+      use Elixact
 
       schema "Schema with custom types" do
         field :email, EmailType do
@@ -153,13 +153,13 @@ defmodule Schemix.JsonSchemaTest do
         "required" => ["email"]
       }
 
-      assert Schemix.JsonSchema.from_schema(SchemaWithCustomTypes) == expected
+      assert Elixact.JsonSchema.from_schema(SchemaWithCustomTypes) == expected
     end
   end
 
   describe "schema references" do
     defmodule AddressSchema do
-      use Schemix
+      use Elixact
 
       schema "Address information" do
         field :street, :string do
@@ -174,7 +174,7 @@ defmodule Schemix.JsonSchemaTest do
     end
 
     defmodule ContactSchema do
-      use Schemix
+      use Elixact
 
       schema "Contact information" do
         field :primary_address, AddressSchema do
@@ -187,7 +187,7 @@ defmodule Schemix.JsonSchemaTest do
     end
 
     defmodule CircularSchema do
-      use Schemix
+      use Elixact
 
       schema "Schema with circular reference" do
         field :name, :string do
@@ -230,7 +230,7 @@ defmodule Schemix.JsonSchemaTest do
         }
       }
 
-      assert Schemix.JsonSchema.from_schema(ContactSchema) == expected
+      assert Elixact.JsonSchema.from_schema(ContactSchema) == expected
     end
 
     test "handles circular references" do
@@ -263,7 +263,7 @@ defmodule Schemix.JsonSchemaTest do
         }
       }
 
-      assert Schemix.JsonSchema.from_schema(CircularSchema) == expected
+      assert Elixact.JsonSchema.from_schema(CircularSchema) == expected
     end
   end
 end

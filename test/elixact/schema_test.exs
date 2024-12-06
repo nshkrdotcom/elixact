@@ -1,9 +1,9 @@
-defmodule Schemix.SchemaTest do
+defmodule Elixact.SchemaTest do
   use ExUnit.Case, async: true
 
   describe "basic schema definition" do
     defmodule BasicSchema do
-      use Schemix
+      use Elixact
 
       schema "Test schema" do
         field :name, :string do
@@ -41,7 +41,7 @@ defmodule Schemix.SchemaTest do
 
   describe "complex type definitions" do
     defmodule AddressSchema do
-      use Schemix
+      use Elixact
 
       schema "Address information" do
         field :street, :string do
@@ -62,7 +62,7 @@ defmodule Schemix.SchemaTest do
     end
 
     defmodule ComplexSchema do
-      use Schemix
+      use Elixact
 
       schema do
         field :tags, {:array, {:map, {:string, {:union, [:string, :integer]}}}} do
@@ -155,7 +155,7 @@ defmodule Schemix.SchemaTest do
 
       assert address_meta.type ==
                {:union,
-                [{:type, :string, []}, {:array, {:ref, Schemix.SchemaTest.AddressSchema}, []}],
+                [{:type, :string, []}, {:array, {:ref, Elixact.SchemaTest.AddressSchema}, []}],
                 []}
 
       assert address_meta.required == true
@@ -165,7 +165,7 @@ defmodule Schemix.SchemaTest do
 
   describe "validation rules" do
     defmodule ValidationSchema do
-      use Schemix
+      use Elixact
 
       schema do
         field :password, :string do
@@ -204,7 +204,7 @@ defmodule Schemix.SchemaTest do
 
   describe "default values" do
     defmodule DefaultSchema do
-      use Schemix
+      use Elixact
 
       schema do
         field :name, :string do

@@ -1,9 +1,9 @@
-defmodule Schemix.Schema do
+defmodule Elixact.Schema do
   @moduledoc """
   Schema DSL for defining data schemas with validation rules and metadata.
   """
 
-  alias Schemix.Types
+  alias Elixact.Types
 
   defmacro schema(description \\ nil, do: block) do
     quote do
@@ -13,13 +13,13 @@ defmodule Schemix.Schema do
 
       # Generate validation functions
       def validate(data) do
-        Schemix.Validator.validate_schema(__MODULE__, data)
+        Elixact.Validator.validate_schema(__MODULE__, data)
       end
 
       def validate!(data) do
         case validate(data) do
           {:ok, validated} -> validated
-          {:error, errors} -> raise Schemix.ValidationError, errors: errors
+          {:error, errors} -> raise Elixact.ValidationError, errors: errors
         end
       end
     end
@@ -117,7 +117,7 @@ defmodule Schemix.Schema do
   # Field macro remains the same
   defmacro field(name, type, do: block) do
     quote do
-      field_meta = %Schemix.FieldMeta{
+      field_meta = %Elixact.FieldMeta{
         name: unquote(name),
         type: unquote(handle_type(type)),
         required: true,

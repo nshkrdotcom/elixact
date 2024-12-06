@@ -1,9 +1,9 @@
-defmodule Schemix.JsonSchema.TypeMapper do
+defmodule Elixact.JsonSchema.TypeMapper do
   @moduledoc """
-  Converts Schemix type definitions to JSON Schema type definitions.
+  Converts Elixact type definitions to JSON Schema type definitions.
   """
 
-  alias Schemix.JsonSchema.ReferenceStore
+  alias Elixact.JsonSchema.ReferenceStore
 
   def to_json_schema(type, store \\ nil)
 
@@ -47,7 +47,7 @@ defmodule Schemix.JsonSchema.TypeMapper do
     if custom_type?(module) do
       module.json_schema()
     else
-      raise "Module #{inspect(module)} is not a valid Schemix type"
+      raise "Module #{inspect(module)} is not a valid Elixact type"
     end
   end
 

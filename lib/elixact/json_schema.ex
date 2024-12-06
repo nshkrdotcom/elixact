@@ -1,5 +1,5 @@
-defmodule Schemix.JsonSchema do
-  alias Schemix.JsonSchema.{TypeMapper, ReferenceStore}
+defmodule Elixact.JsonSchema do
+  alias Elixact.JsonSchema.{TypeMapper, ReferenceStore}
 
   def from_schema(schema) when is_atom(schema) do
     {:ok, store} = ReferenceStore.start_link()

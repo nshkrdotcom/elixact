@@ -1,6 +1,6 @@
-defmodule Schemix.Types.CoercionTest do
+defmodule Elixact.Types.CoercionTest do
   use ExUnit.Case, async: true
-  alias Schemix.Types
+  alias Elixact.Types
 
   test "coerces string to integer" do
     assert {:ok, 123} = Types.coerce(:integer, "123")

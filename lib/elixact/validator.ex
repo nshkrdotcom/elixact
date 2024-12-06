@@ -1,9 +1,9 @@
-defmodule Schemix.Validator do
+defmodule Elixact.Validator do
   @moduledoc """
   Validates values against type definitions and schemas.
   """
 
-  alias Schemix.Error
+  alias Elixact.Error
 
   @doc """
   Validates data against a schema module, checking for required fields,
@@ -111,7 +111,7 @@ defmodule Schemix.Validator do
   end
 
   def validate({:type, name, constraints}, value, path) do
-    case Schemix.Types.validate(name, value) do
+    case Elixact.Types.validate(name, value) do
       {:ok, validated} -> apply_constraints(validated, constraints, path)
       {:error, error} -> {:error, %{error | path: path ++ error.path}}
     end

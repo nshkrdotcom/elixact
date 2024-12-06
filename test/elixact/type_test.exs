@@ -1,12 +1,12 @@
-defmodule Schemix.TypeTest do
+defmodule Elixact.TypeTest do
   use ExUnit.Case, async: true
 
   defmodule TestEmail do
-    use Schemix.Type
+    use Elixact.Type
 
     def type_definition do
-      Schemix.Types.string()
-      |> Schemix.Types.with_constraints([
+      Elixact.Types.string()
+      |> Elixact.Types.with_constraints([
         # Wrap regex in a list
         {:format, ~r/^[^\s]+@[^\s]+$/}
       ])

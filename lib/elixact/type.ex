@@ -1,16 +1,16 @@
-defmodule Schemix.Type do
+defmodule Elixact.Type do
   @moduledoc """
   Behaviour and macros for defining custom types.
   """
 
-  @callback type_definition() :: Schemix.Types.type_definition()
+  @callback type_definition() :: Elixact.Types.type_definition()
   @callback json_schema() :: map()
   @callback validate(term()) :: {:ok, term()} | {:error, term()}
 
   defmacro __using__(_opts) do
     quote do
-      @behaviour Schemix.Type
-      import Schemix.Types
+      @behaviour Elixact.Type
+      import Elixact.Types
 
       Module.register_attribute(__MODULE__, :type_metadata, accumulate: true)
 
@@ -25,7 +25,7 @@ defmodule Schemix.Type do
 
       defp validate_type(value, path) do
         type = type_definition()
-        Schemix.Validator.validate(type, value, path)
+        Elixact.Validator.validate(type, value, path)
       end
 
       defp maybe_coerce(value) do

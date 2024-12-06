@@ -1,7 +1,7 @@
-# test/schemix/validator_test.exs
-defmodule Schemix.ValidatorTest do
+# test/elixact/validator_test.exs
+defmodule Elixact.ValidatorTest do
   use ExUnit.Case, async: true
-  alias Schemix.{Types, Validator}
+  alias Elixact.{Types, Validator}
 
   describe "basic type validation" do
     test "validates string" do
