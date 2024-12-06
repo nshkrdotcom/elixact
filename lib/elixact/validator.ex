@@ -46,7 +46,7 @@ defmodule Elixact.Validator do
         field_path = path ++ [name]
 
         value =
-          case {Map.fetch(data, name), Map.fetch(data, Atom.to_string(name))} |> dbg do
+          case {Map.fetch(data, name), Map.fetch(data, Atom.to_string(name))} do
             {{:ok, value}, _} -> {:ok, value}
             {_, {:ok, value}} -> {:ok, value}
             {_, _} -> :error
