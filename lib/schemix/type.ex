@@ -16,16 +16,16 @@ defmodule Schemix.Type do
 
       def metadata, do: @type_metadata
 
-      def validate(value) do
+      def validate(value, path \\ []) do
         with {:ok, coerced} <- maybe_coerce(value),
-             {:ok, validated} <- validate_type(coerced) do
-          validate_custom_rules(validated)
+             {:ok, validated} <- validate_type(coerced, path) do
+          validate_custom_rules(validated, path)
         end
       end
 
-      defp validate_type(value) do
+      defp validate_type(value, path) do
         type = type_definition()
-        Schemix.Validator.validate(type, value)
+        Schemix.Validator.validate(type, value, path)
       end
 
       defp maybe_coerce(value) do
@@ -36,12 +36,12 @@ defmodule Schemix.Type do
         end
       end
 
-      defp validate_custom_rules(value) do
+      defp validate_custom_rules(value, path) do
         Enum.reduce_while(custom_rules(), {:ok, value}, fn rule, {:ok, val} ->
           case apply(__MODULE__, rule, [val]) do
             true -> {:cont, {:ok, val}}
             false -> {:halt, {:error, "failed custom rule: #{rule}"}}
-            {:error, reason} -> {:halt, {:error, reason}}
+            {:error, reason} -> {:halt, {:error, reason, path: path}}
           end
         end)
       end

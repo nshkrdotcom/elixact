@@ -8,12 +8,11 @@ defmodule Schemix.SchemaTest do
       schema "Test schema" do
         field :name, :string do
           description("User's name")
-          required(true)
         end
 
         field :age, :integer do
           description("User's age")
-          optional(true)
+          optional()
         end
       end
     end
@@ -31,13 +30,11 @@ defmodule Schemix.SchemaTest do
       # Required field
       assert name_meta.description == "User's name"
       assert name_meta.required == true
-      assert name_meta.optional == false
       assert name_meta.type == {:type, :string, []}
 
       # Optional field
       assert age_meta.description == "User's age"
       assert age_meta.required == false
-      assert age_meta.optional == true
       assert age_meta.type == {:type, :integer, []}
     end
   end
@@ -48,17 +45,17 @@ defmodule Schemix.SchemaTest do
 
       schema "Address information" do
         field :street, :string do
-          required(true)
+          required()
           description("Street address")
         end
 
         field :city, :string do
-          required(true)
+          required()
           description("City name")
         end
 
         field :country, :string do
-          required(true)
+          required()
           description("Country name")
         end
       end
@@ -77,25 +74,25 @@ defmodule Schemix.SchemaTest do
 
         field :id, {:union, [:string, :integer, {:array, :float}]} do
           description("User ID (string, integer or array of floats)")
-          required(true)
+          required()
           example("user_123")
           examples([123, [1.0, 2.5, 3.14]])
         end
 
         field :metadata, {:map, {:string, {:array, {:map, {:string, :any}}}}} do
           description("Nested metadata structure")
-          optional(true)
+          optional()
           default(%{})
         end
 
-        field :settings, {:map, {:atom, {:union, [:string, :boolean, {:array, :integer}]}}} do
+        field :settings, {:map, {:string, {:union, [:string, :boolean, {:array, :integer}]}}} do
           description("User settings with various value types")
-          required(true)
+          required()
         end
 
         field :address, {:union, [:string, {:array, AddressSchema}]} do
           description("User's address (string or list of addresses)")
-          required(true)
+          required()
         end
       end
     end
@@ -108,8 +105,7 @@ defmodule Schemix.SchemaTest do
                {:array,
                 {:map,
                  {{:type, :string, []},
-                  {:union, [{:type, :string, []}, {:type, :integer, []}], []}},
-                 []},
+                  {:union, [{:type, :string, []}, {:type, :integer, []}], []}}, []},
                 [min_items: 1, max_items: 10]}
 
       assert tags_meta.default == []
@@ -119,7 +115,11 @@ defmodule Schemix.SchemaTest do
       fields = ComplexSchema.__schema__(:fields)
       {:id, id_meta} = Enum.find(fields, fn {name, _} -> name == :id end)
 
-      assert id_meta.type == {:union, [:string, :integer, {:array, :float}], []}
+      assert id_meta.type ==
+               {:union,
+                [{:type, :string, []}, {:type, :integer, []}, {:array, {:type, :float, []}, []}],
+                []}
+
       assert id_meta.required == true
       assert id_meta.example == "user_123"
       assert id_meta.examples == [123, [1.0, 2.5, 3.14]]
@@ -133,15 +133,19 @@ defmodule Schemix.SchemaTest do
       assert meta_meta.type ==
                {:map,
                 {{:type, :string, []},
-                 {:array,
-                  {:map, {{:type, :string, []}, {:type, :any, []}}, []},
-                  []}},
-                []}
+                 {:array, {:map, {{:type, :string, []}, {:type, :any, []}}, []}, []}}, []}
 
       assert settings_meta.type ==
-               {:map, {{:type, :atom, []}, {:union, [:string, :boolean, {:array, :integer}], []}}, []}
+               {:map,
+                {{:type, :string, []},
+                 {:union,
+                  [
+                    {:type, :string, []},
+                    {:type, :boolean, []},
+                    {:array, {:type, :integer, []}, []}
+                  ], []}}, []}
 
-      assert meta_meta.optional == true
+      assert meta_meta.required == false
       assert settings_meta.required == true
     end
 
@@ -149,7 +153,11 @@ defmodule Schemix.SchemaTest do
       fields = ComplexSchema.__schema__(:fields)
       {:address, address_meta} = Enum.find(fields, fn {name, _} -> name == :address end)
 
-      assert address_meta.type == {:union, [:string, {:array, AddressSchema}], []}
+      assert address_meta.type ==
+               {:union,
+                [{:type, :string, []}, {:array, {:ref, Schemix.SchemaTest.AddressSchema}, []}],
+                []}
+
       assert address_meta.required == true
       assert address_meta.description == "User's address (string or list of addresses)"
     end
@@ -161,11 +169,11 @@ defmodule Schemix.SchemaTest do
 
       schema do
         field :password, :string do
-          required(true)
+          required()
         end
 
         field :password_confirmation, :string do
-          required(true)
+          required()
         end
       end
 
@@ -200,7 +208,7 @@ defmodule Schemix.SchemaTest do
 
       schema do
         field :name, :string do
-          required(true)
+          required()
         end
 
         field :status, :string do
@@ -217,14 +225,13 @@ defmodule Schemix.SchemaTest do
       # Validate the data
       assert {:ok, validated} = DefaultSchema.validate(valid_data)
       assert validated.status == "active"
-      
+
       # Get field metadata and verify default value
       fields = DefaultSchema.__schema__(:fields)
       {_, status_meta} = Enum.find(fields, fn {name, _} -> name == :status end)
       assert status_meta.default == "active"
-      
+
       # Verify field is optional
-      assert status_meta.optional == true
       assert status_meta.required == false
     end
   end

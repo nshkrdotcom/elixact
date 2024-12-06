@@ -7,17 +7,11 @@ defmodule Schemix.Schema do
 
   defmacro schema(description \\ nil, do: block) do
     quote do
-      Module.register_attribute(__MODULE__, :fields, accumulate: true)
       Module.register_attribute(__MODULE__, :config, [])
 
       @schema_description unquote(description)
 
       unquote(block)
-
-      # Generate schema metadata at compile time
-      def __schema__(:description), do: @schema_description
-      def __schema__(:fields), do: @fields
-      def __schema__(:config), do: @config
 
       # Generate validation functions
       def validate(data) do
@@ -128,9 +122,11 @@ defmodule Schemix.Schema do
       field_meta = %Schemix.FieldMeta{
         name: unquote(name),
         type: unquote(handle_type(type)),
+        required: true,
         constraints: []
       }
 
+      # Create a variable accessible across all nested macros in this field block
       var!(field_meta) = field_meta
       unquote(block)
 
@@ -171,37 +167,35 @@ defmodule Schemix.Schema do
     end
   end
 
-  defmacro required(bool) do
+  defmacro required() do
     quote do
       var!(field_meta) =
         var!(field_meta)
-        |> Map.put(:required, unquote(bool))
-        |> Map.put(:optional, not unquote(bool))
+        |> Map.put(:required, true)
     end
   end
 
-  defmacro optional(bool) do
+  defmacro optional() do
     quote do
       var!(field_meta) =
         var!(field_meta)
-        |> Map.put(:optional, unquote(bool))
-        |> Map.put(:required, not unquote(bool))
+        |> Map.put(:required, false)
     end
   end
 
   defmacro default(value) do
     quote do
-      var!(field_meta) = 
+      var!(field_meta) =
         var!(field_meta)
         |> Map.put(:default, unquote(value))
-        |> Map.put(:optional, true)
+        |> Map.put(:required, false)
     end
   end
 
   # Handle type definitions
   defp handle_type({:array, type}) do
     quote do
-      Types.array(unquote(type))
+      Types.array(unquote(handle_type(type)))
     end
   end
 
@@ -209,15 +203,15 @@ defmodule Schemix.Schema do
   defp handle_type({:map, {key_type, value_type}}) do
     normalized_key = handle_type(key_type)
     normalized_value = handle_type(value_type)
+
     quote do
       Types.map(unquote(normalized_key), unquote(normalized_value))
     end
   end
 
-  # Handle union types
   defp handle_type({:union, types}) do
     quote do
-      Types.union(unquote(types))
+      Types.union(unquote(types |> Enum.map(&handle_type/1)))
     end
   end
 

@@ -41,6 +41,13 @@ defmodule Schemix.Types do
       ])
   """
 
+  @type type_definition ::
+          {:type, atom(), [any()]}
+          | {:array, type_definition, [any()]}
+          | {:map, {type_definition, type_definition}, [any()]}
+          | {:union, [type_definition], [any()]}
+          | {:ref, atom()}
+
   alias Schemix.Error
 
   # Basic types
@@ -66,31 +73,6 @@ defmodule Schemix.Types do
     {:array, normalized, []}
   end
 
-  # Helper to normalize type definitions
-  defp normalize_type({:map, {key_type, value_type}}) do
-    {:map, {normalize_type(key_type), normalize_type(value_type)}, []}
-  end
-  defp normalize_type({:union, types}) when is_list(types) do
-    {:union, Enum.map(types, &normalize_type/1), []}
-  end
-  defp normalize_type(type) when is_atom(type) do
-    case type do
-      :string -> {:type, :string, []}
-      :integer -> {:type, :integer, []}
-      :float -> {:type, :float, []}
-      :boolean -> {:type, :boolean, []}
-      :any -> {:type, :any, []}
-      _ -> 
-        if Code.ensure_loaded?(type) and function_exported?(type, :__schema__, 1) do
-          type
-        else
-          {:type, type, []}
-        end
-      _ -> {:type, type, []}
-    end
-  end
-  defp normalize_type(other), do: other
-
   def map(key_type, value_type) do
     normalized_key = normalize_type(key_type)
     normalized_value = normalize_type(value_type)
@@ -100,6 +82,49 @@ defmodule Schemix.Types do
   def union(types) when is_list(types), do: {:union, types, []}
   # Type reference
   def ref(schema), do: {:ref, schema}
+
+  # Helper to normalize type definitions
+  def normalize_type({:map, {key_type, value_type}}) do
+    {:map, {normalize_type(key_type), normalize_type(value_type)}, []}
+  end
+
+  def normalize_type({:union, types}) when is_list(types) do
+    {:union, Enum.map(types, &normalize_type/1), []}
+  end
+
+  def normalize_type(type) when is_atom(type) do
+    case type do
+      :string ->
+        {:type, :string, []}
+
+      :integer ->
+        {:type, :integer, []}
+
+      :float ->
+        {:type, :float, []}
+
+      :boolean ->
+        {:type, :boolean, []}
+
+      :any ->
+        {:type, :any, []}
+
+      _ ->
+        cond do
+          Code.ensure_loaded?(type) and function_exported?(type, :__schema__, 1) ->
+            {:ref, type}
+
+          Code.ensure_loaded?(type) and function_exported?(type, :type_definition, 0) ->
+            type.type_definition()
+
+          true ->
+            # Assume it's a schema module but not yet loaded (could be a circular reference)
+            {:ref, type}
+        end
+    end
+  end
+
+  def normalize_type(other), do: other
 
   # Add coercion helpers
   def coerce(:string, value) when is_integer(value), do: {:ok, Integer.to_string(value)}

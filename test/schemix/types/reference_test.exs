@@ -7,11 +7,9 @@ defmodule Schemix.Types.ReferenceTest do
 
     schema "Address information" do
       field :street, :string do
-        required(true)
       end
 
       field :city, :string do
-        required(true)
       end
     end
   end

@@ -9,7 +9,7 @@ defmodule Schemix.JsonSchema.TypeMapper do
 
   def to_json_schema(type, store) do
     cond do
-      is_atom(type) and schema_module?(type) ->
+      match?({:ref, _}, type) ->
         handle_schema_reference(type, store)
 
       is_atom(type) and custom_type?(type) ->
@@ -19,7 +19,7 @@ defmodule Schemix.JsonSchema.TypeMapper do
         module = Macro.expand(type, __ENV__)
 
         if schema_module?(module) do
-          handle_schema_reference(module, store)
+          handle_schema_reference({:ref, module}, store)
         else
           apply_type_module(module)
         end
@@ -34,7 +34,7 @@ defmodule Schemix.JsonSchema.TypeMapper do
     Code.ensure_loaded?(module) and function_exported?(module, :__schema__, 1)
   end
 
-  defp handle_schema_reference(module, store) when is_atom(module) do
+  defp handle_schema_reference({:ref, module}, store) when is_atom(module) do
     if store do
       ReferenceStore.add_reference(store, module)
       %{"$ref" => ReferenceStore.ref_path(module)}
@@ -58,7 +58,7 @@ defmodule Schemix.JsonSchema.TypeMapper do
   # Normalize type definitions
   defp normalize_type(type) when is_atom(type) do
     cond do
-      schema_module?(type) -> type
+      schema_module?(type) -> {:ref, type}
       true -> {:type, type, []}
     end
   end
@@ -84,7 +84,7 @@ defmodule Schemix.JsonSchema.TypeMapper do
   # Convert normalized types
   defp convert_normalized_type(type, store) do
     cond do
-      is_atom(type) and schema_module?(type) ->
+      match?({:ref, _}, type) and schema_module?(type |> elem(1)) ->
         handle_schema_reference(type, store)
 
       true ->
@@ -114,6 +114,7 @@ defmodule Schemix.JsonSchema.TypeMapper do
   defp map_basic_type(:integer), do: %{"type" => "integer"}
   defp map_basic_type(:float), do: %{"type" => "number"}
   defp map_basic_type(:boolean), do: %{"type" => "boolean"}
+
   defp map_basic_type(module) when is_atom(module) do
     name = module |> Module.split() |> List.last()
     %{"$ref" => "#/definitions/#{name}"}

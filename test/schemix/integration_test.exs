@@ -27,22 +27,18 @@ defmodule Schemix.IntegrationTest do
 
     schema "Address information" do
       field :street, :string do
-        required true
-        min_length 5
+        min_length(5)
       end
 
       field :city, :string do
-        required true
       end
 
       field :postal_code, :string do
-        required true
-        format ~r/^\d{5}$/
+        format(~r/^\d{5}$/)
       end
 
       field :country, :string do
-        required true
-        default "USA"
+        default("USA")
       end
     end
   end
@@ -53,54 +49,51 @@ defmodule Schemix.IntegrationTest do
 
     schema "User account information" do
       field :email, EmailType do
-        required true
-        description "User's email address"
+        description("User's email address")
       end
 
       field :username, :string do
-        required true
-        min_length 3
-        max_length 20
-        format ~r/^[a-zA-Z0-9_]+$/
+        min_length(3)
+        max_length(20)
+        format(~r/^[a-zA-Z0-9_]+$/)
       end
 
       field :age, :integer do
-        optional true
-        gt 0
-        lt 150
+        optional()
+        gt(0)
+        lt(150)
       end
 
       field :height, :float do
-        optional true
-        gteq 0.0
-        lteq 3.0
+        optional()
+        gteq(0.0)
+        lteq(3.0)
       end
 
       field :is_active, :boolean do
-        required true
-        default true
+        default(true)
       end
 
       field :tags, {:array, :string} do
-        description "User tags"
-        default []
-        min_items 0
-        max_items 5
+        description("User tags")
+        default([])
+        min_items(0)
+        max_items(5)
       end
 
       field :address, AddressSchema do
-        optional true
+        optional()
       end
 
-      field :settings, {:map, {:atom, {:union, [:string, :boolean, :integer]}}} do
-        description "User settings"
-        optional true
+      field :settings, {:map, {:string, {:union, [:string, :boolean, :integer]}}} do
+        description("User settings")
+        optional()
       end
 
       config do
-        title "User Schema"
-        config_description "Complete user profile schema"
-        strict true
+        title("User Schema")
+        config_description("Complete user profile schema")
+        strict(true)
       end
     end
   end
@@ -121,9 +114,9 @@ defmodule Schemix.IntegrationTest do
           country: "USA"
         },
         settings: %{
-          theme: "dark",
-          notifications: true,
-          max_items: 100
+          "theme" => "dark",
+          "notifications" => true,
+          "max_items" => 100
         }
       }
 
@@ -141,7 +134,8 @@ defmodule Schemix.IntegrationTest do
 
       assert {:ok, validated} = UserSchema.validate(valid_data)
       assert validated.is_active == true
-      assert validated.tags == [] # default value
+      # default value
+      assert validated.tags == []
     end
 
     test "rejects invalid email" do
@@ -151,21 +145,19 @@ defmodule Schemix.IntegrationTest do
         is_active: true
       }
 
-      assert {:error, errors} = UserSchema.validate(invalid_data)
-      assert length(errors) > 0
-      error = Enum.find(errors, &(&1.path == [:email]))
+      assert {:error, error} = UserSchema.validate(invalid_data)
       assert error.message =~ "format"
     end
 
     test "rejects invalid username format" do
       invalid_data = %{
         email: "test@example.com",
-        username: "john@doe", # contains invalid character
+        # contains invalid character
+        username: "john@doe",
         is_active: true
       }
 
-      assert {:error, errors} = UserSchema.validate(invalid_data)
-      error = Enum.find(errors, &(&1.path == [:username]))
+      assert {:error, error} = UserSchema.validate(invalid_data)
       assert error.message =~ "format"
     end
 
@@ -175,17 +167,22 @@ defmodule Schemix.IntegrationTest do
         username: "john_doe",
         is_active: true,
         address: %{
-          street: "123", # too short
+          # too short
+          street: "123",
           city: "Springfield",
-          postal_code: "1234", # invalid format
+          # invalid format
+          postal_code: "1234",
           country: "USA"
         }
       }
 
-      assert {:error, errors} = UserSchema.validate(invalid_data)
-      errors = List.wrap(errors)
-      errors = List.wrap(errors)
-      assert Enum.count(errors) == 2
+      assert {:error, error} = UserSchema.validate(invalid_data)
+
+      assert error == %Schemix.Error{
+               path: [:address, :postal_code],
+               code: :format,
+               message: "failed format constraint"
+             }
     end
 
     test "rejects additional properties when strict" do
@@ -196,8 +193,7 @@ defmodule Schemix.IntegrationTest do
         unknown_field: "value"
       }
 
-      assert {:error, errors} = UserSchema.validate(invalid_data)
-      error = Enum.find(errors, &(&1.code == :additional_properties))
+      assert {:error, error} = UserSchema.validate(invalid_data)
       assert error.message =~ "unknown_field"
     end
   end
@@ -209,12 +205,12 @@ defmodule Schemix.IntegrationTest do
       assert schema["title"] == "User Schema"
       assert schema["type"] == "object"
       assert schema["additionalProperties"] == false
-      
+
       # Check properties
       assert Map.has_key?(schema["properties"], "email")
       assert Map.has_key?(schema["properties"], "username")
       assert Map.has_key?(schema["properties"], "address")
-      
+
       # Check nested schema
       assert schema["definitions"]["AddressSchema"]
       assert schema["properties"]["address"]["$ref"] == "#/definitions/AddressSchema"

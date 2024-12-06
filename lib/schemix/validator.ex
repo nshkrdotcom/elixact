@@ -28,7 +28,7 @@ defmodule Schemix.Validator do
   defp validate_fields(fields, data, path) do
     Enum.reduce_while(fields, {:ok, %{}}, fn
       {name, meta}, {:ok, acc} ->
-        field_path = [name | path]
+        field_path = path ++ [name]
 
         case Map.fetch(data, name) do
           {:ok, value} ->
@@ -41,8 +41,10 @@ defmodule Schemix.Validator do
             cond do
               Map.has_key?(meta, :default) ->
                 {:cont, {:ok, Map.put(acc, name, meta.default)}}
+
               meta.optional == true || meta.required == false ->
                 {:cont, {:ok, acc}}
+
               true ->
                 {:halt, {:error, Error.new(field_path, :required, "field is required")}}
             end
@@ -75,6 +77,10 @@ defmodule Schemix.Validator do
     cond do
       Code.ensure_loaded?(schema) and function_exported?(schema, :__schema__, 1) ->
         validate_schema(schema, value, path)
+
+      Code.ensure_loaded?(schema) and function_exported?(schema, :type_definition, 0) ->
+        schema.validate(value, path)
+
       true ->
         {:error, Error.new(path, :type, "#{inspect(value)} is not a valid #{inspect(schema)}")}
     end
@@ -220,7 +226,8 @@ defmodule Schemix.Validator do
   end
 
   defp validate_union(value, types, path) do
-    results = Enum.map(types, &validate(&1, value, path))
+    results =
+      Enum.map(types, &validate(&1, value, path))
 
     case Enum.find(results, &match?({:ok, _}, &1)) do
       {:ok, validated} -> {:ok, validated}

@@ -9,12 +9,11 @@ defmodule Schemix.JsonSchemaTest do
         field :name, :string do
           description("User's name")
           example("John Doe")
-          required(true)
         end
 
         field :age, :integer do
           description("User's age")
-          optional(true)
+          optional()
           default(18)
         end
 
@@ -62,11 +61,10 @@ defmodule Schemix.JsonSchemaTest do
 
       schema "Configured schema" do
         field :name, :string do
-          required(true)
         end
 
         field :data, {:map, {:string, :string}} do
-          optional(true)
+          optional()
         end
 
         config do
@@ -124,12 +122,11 @@ defmodule Schemix.JsonSchemaTest do
 
       schema "Schema with custom types" do
         field :email, EmailType do
-          required(true)
           description("User's email address")
         end
 
         field :backup_email, EmailType do
-          optional(true)
+          optional()
           description("Backup email address")
         end
       end
@@ -166,15 +163,12 @@ defmodule Schemix.JsonSchemaTest do
 
       schema "Address information" do
         field :street, :string do
-          required(true)
         end
 
         field :city, :string do
-          required(true)
         end
 
         field :country, :string do
-          required(true)
         end
       end
     end
@@ -184,11 +178,10 @@ defmodule Schemix.JsonSchemaTest do
 
       schema "Contact information" do
         field :primary_address, AddressSchema do
-          required(true)
         end
 
         field :shipping_address, AddressSchema do
-          optional(true)
+          optional()
         end
       end
     end
@@ -198,15 +191,14 @@ defmodule Schemix.JsonSchemaTest do
 
       schema "Schema with circular reference" do
         field :name, :string do
-          required(true)
         end
 
         field :parent, CircularSchema do
-          optional(true)
+          optional()
         end
 
         field :children, {:array, CircularSchema} do
-          optional(true)
+          optional()
         end
       end
     end
