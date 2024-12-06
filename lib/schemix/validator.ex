@@ -32,7 +32,9 @@ defmodule Schemix.Validator do
   defp validate_required_fields(fields, data, path) do
     required_fields = for {name, meta} <- fields, meta.required, do: name
 
-    case Enum.find(required_fields, &(not Map.has_key?(data, &1))) do
+    case Enum.find(required_fields, fn field ->
+           not (Map.has_key?(data, field) or Map.has_key?(data, Atom.to_string(field)))
+         end) do
       nil -> :ok
       field -> {:error, Error.new([field | path], :required, "field is required")}
     end
@@ -43,7 +45,14 @@ defmodule Schemix.Validator do
       {name, meta}, {:ok, acc} ->
         field_path = path ++ [name]
 
-        case Map.fetch(data, name) do
+        value =
+          case {Map.fetch(data, name), Map.fetch(data, Atom.to_string(name))} |> dbg do
+            {{:ok, value}, _} -> {:ok, value}
+            {_, {:ok, value}} -> {:ok, value}
+            {_, _} -> :error
+          end
+
+        case value do
           {:ok, value} ->
             case validate(meta.type, value, field_path) do
               {:ok, validated} -> {:cont, {:ok, Map.put(acc, name, validated)}}

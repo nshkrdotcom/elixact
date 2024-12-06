@@ -198,6 +198,68 @@ defmodule Schemix.IntegrationTest do
     end
   end
 
+  describe "string keys support" do
+    defmodule StringKeysSchema do
+      use Schemix
+
+      schema do
+        field :name, :string do
+          required()
+        end
+
+        field :age, :integer do
+          optional()
+        end
+      end
+    end
+
+    test "accepts both atom and string keys when enabled" do
+      # With atom keys
+      atom_data = %{
+        name: "John",
+        age: 30
+      }
+
+      # With string keys
+      string_data = %{
+        "name" => "John",
+        "age" => 30
+      }
+
+      # Mixed keys
+      mixed_data = %{
+        "age" => 30,
+        name: "John"
+      }
+
+      assert {:ok, validated} = StringKeysSchema.validate(atom_data)
+      assert validated.name == "John"
+      assert validated.age == 30
+
+      assert {:ok, validated} = StringKeysSchema.validate(string_data)
+      assert validated.name == "John"
+      assert validated.age == 30
+
+      assert {:ok, validated} = StringKeysSchema.validate(mixed_data)
+      assert validated.name == "John"
+      assert validated.age == 30
+    end
+
+    test "maintains atom keys in output" do
+      input = %{
+        "name" => "John",
+        "age" => 30
+      }
+
+      {:ok, validated} = StringKeysSchema.validate(input)
+
+      assert Map.has_key?(validated, :name)
+      assert Map.has_key?(validated, :age)
+      refute Map.has_key?(validated, "name")
+      refute Map.has_key?(validated, "age")
+    end
+  end
+
   describe "JSON Schema generation" do
     test "generates valid JSON Schema" do
       schema = Schemix.JsonSchema.from_schema(UserSchema)
