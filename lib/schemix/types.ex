@@ -146,10 +146,6 @@ defmodule Schemix.Types do
 
   def coerce(_, value), do: {:error, "cannot coerce #{inspect(value)}"}
 
-  # Type modifiers
-  def optional(type), do: {:optional, type}
-  def required(type), do: {:required, type}
-
   # Type constraints
   def with_constraints(type, constraints) do
     case type do

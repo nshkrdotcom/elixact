@@ -61,10 +61,10 @@ defmodule Schemix do
       import Schemix.Schema
 
       # Register accumulating attributes
-      Module.register_attribute(__MODULE__, :schema_description, persist: true)
-      Module.register_attribute(__MODULE__, :fields, accumulate: true, persist: true)
-      Module.register_attribute(__MODULE__, :validations, accumulate: true, persist: true)
-      Module.register_attribute(__MODULE__, :config, persist: true)
+      Module.register_attribute(__MODULE__, :schema_description, [])
+      Module.register_attribute(__MODULE__, :fields, accumulate: true)
+      Module.register_attribute(__MODULE__, :validations, accumulate: true)
+      Module.register_attribute(__MODULE__, :config, [])
 
       @before_compile Schemix
     end

@@ -7,8 +7,6 @@ defmodule Schemix.Schema do
 
   defmacro schema(description \\ nil, do: block) do
     quote do
-      Module.register_attribute(__MODULE__, :config, [])
-
       @schema_description unquote(description)
 
       unquote(block)
@@ -221,16 +219,17 @@ defmodule Schemix.Schema do
     end
   end
 
-  # Handle module references and other atoms
-  defp handle_type(module) when is_atom(module) do
+  # Handle built-in types and references
+  defp handle_type(type) when is_atom(type) do
     cond do
-      Code.ensure_loaded?(module) && function_exported?(module, :__schema__, 1) ->
-        {:ref, module}
-
-      true ->
+      type in [:string, :integer, :float, :boolean, :any] ->
         quote do
-          Types.type(unquote(module))
+          Types.type(unquote(type))
         end
+
+      # Assume it's a reference
+      true ->
+        {:ref, type}
     end
   end
 
@@ -266,36 +265,6 @@ defmodule Schemix.Schema do
   defmacro strict(bool) do
     quote do
       var!(config) = Map.put(var!(config), :strict, unquote(bool))
-    end
-  end
-
-  defmacro __before_compile__(_env) do
-    quote do
-      def __schema__(:description), do: @schema_description
-      def __schema__(:fields), do: @fields
-      def __schema__(:validations), do: @validations
-      def __schema__(:config), do: @config
-
-      @doc """
-      Validates data against this schema.
-
-      Returns `{:ok, validated_data}` or `{:error, errors}`.
-      """
-      def validate(data) do
-        Schemix.Validator.validate_schema(__MODULE__, data)
-      end
-
-      @doc """
-      Validates data against this schema, raising on error.
-
-      Returns validated data or raises Schemix.ValidationError.
-      """
-      def validate!(data) do
-        case validate(data) do
-          {:ok, validated} -> validated
-          {:error, errors} -> raise Schemix.ValidationError, errors: errors
-        end
-      end
     end
   end
 end

@@ -5,6 +5,19 @@ defmodule Schemix.Validator do
 
   alias Schemix.Error
 
+  @doc """
+  Validates data against a schema module, checking for required fields,
+  field-level validations, and strict mode constraints if enabled.
+
+  Returns {:ok, validated_data} on success or {:error, error} on validation failures.
+
+  ## Parameters
+
+    - schema: Schema module to validate against
+    - data: Data to validate
+    - path: Current validation path for error messages. Defaults to `[]`.
+
+  """
   def validate_schema(schema, data, path \\ []) when is_atom(schema) do
     fields = schema.__schema__(:fields)
     config = schema.__schema__(:config) || %{}
@@ -75,14 +88,16 @@ defmodule Schemix.Validator do
 
   def validate(schema, value, path) when is_atom(schema) do
     cond do
+      # Reference a Schema module
       Code.ensure_loaded?(schema) and function_exported?(schema, :__schema__, 1) ->
         validate_schema(schema, value, path)
 
+      # Custom type
       Code.ensure_loaded?(schema) and function_exported?(schema, :type_definition, 0) ->
         schema.validate(value, path)
 
       true ->
-        {:error, Error.new(path, :type, "#{inspect(value)} is not a valid #{inspect(schema)}")}
+        raise ArgumentError, "invalid schema: #{inspect(schema)}"
     end
   end
 
