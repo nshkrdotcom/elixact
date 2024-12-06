@@ -44,10 +44,7 @@ defmodule Elixact.SchemaTest do
       use Elixact
 
       schema "Address information" do
-        field :street, :string do
-          required()
-          description("Street address")
-        end
+        field(:street, :string)
 
         field :city, :string do
           required()

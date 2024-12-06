@@ -124,7 +124,15 @@ defmodule Elixact.Schema do
   end
 
   # Field macro remains the same
-  defmacro field(name, type, do: block) do
+  defmacro field(name, type, opts \\ []) do
+    {block, _opts} =
+      Keyword.pop(
+        opts,
+        :do,
+        quote do
+        end
+      )
+
     quote do
       field_meta = %Elixact.FieldMeta{
         name: unquote(name),
@@ -135,6 +143,7 @@ defmodule Elixact.Schema do
 
       # Create a variable accessible across all nested macros in this field block
       var!(field_meta) = field_meta
+
       unquote(block)
 
       # Apply constraints to the type
