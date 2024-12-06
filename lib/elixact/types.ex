@@ -175,6 +175,8 @@ defmodule Elixact.Types do
   def validate(:boolean, value),
     do: {:error, Error.new([], :type, "expected boolean, got #{inspect(value)}")}
 
+  def validate(:any, value), do: {:ok, value}
+
   def validate(type, value) do
     {:error, Error.new([], :type, "#{inspect(value)} is not a valid #{inspect(type)}")}
   end
