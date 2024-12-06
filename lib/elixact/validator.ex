@@ -192,6 +192,11 @@ defmodule Elixact.Validator do
     Regex.match?(regex, value)
   end
 
+  # Choices constraint
+  defp apply_constraint(:choices, value, allowed_values) do
+    value in allowed_values
+  end
+
   # Array validation
   defp validate_array_items(items, type, constraints, path) do
     results =

@@ -114,6 +114,15 @@ defmodule Elixact.Schema do
     end
   end
 
+  defmacro choices(values) when is_list(values) do
+    quote do
+      current_constraints = Map.get(var!(field_meta), :constraints, [])
+
+      var!(field_meta) =
+        Map.put(var!(field_meta), :constraints, [{:choices, unquote(values)} | current_constraints])
+    end
+  end
+
   # Field macro remains the same
   defmacro field(name, type, do: block) do
     quote do

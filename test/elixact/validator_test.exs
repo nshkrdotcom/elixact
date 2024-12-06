@@ -28,6 +28,17 @@ defmodule Elixact.ValidatorTest do
       assert {:error, _} = Validator.validate(type, "Test123")
     end
 
+    test "validates string with choices constraint" do
+      type =
+        Types.string()
+        |> Types.with_constraints([{:choices, ["draft", "published", "archived"]}])
+
+      assert {:ok, "draft"} = Validator.validate(type, "draft")
+      assert {:ok, "published"} = Validator.validate(type, "published")
+      assert {:ok, "archived"} = Validator.validate(type, "archived")
+      assert {:error, _} = Validator.validate(type, "invalid")
+    end
+
     test "validates integer" do
       type = Types.integer()
       assert {:ok, 123} = Validator.validate(type, 123)
