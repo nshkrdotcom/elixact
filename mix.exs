@@ -1,15 +1,18 @@
 defmodule Elixact.MixProject do
   use Mix.Project
+  @source_url "https://github.com/LiboShen/elixact"
+  @version "0.1.1"
 
   def project do
     [
       app: :elixact,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description: "Schema definition and validation library for Elixir",
-      package: package()
+      package: package(),
+      docs: docs()
     ]
   end
 
@@ -33,7 +36,18 @@ defmodule Elixact.MixProject do
     [
       name: "elixact",
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/LiboShen/elixact"}
+      links: %{"GitHub" => @source_url}
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      source_ref: "v#{@version}",
+      source_url: @source_url,
+      extras: [
+        "README.md"
+      ]
     ]
   end
 end
