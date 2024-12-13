@@ -8,7 +8,6 @@ defmodule Elixact.ValidationError do
   @impl true
   def message(%{errors: errors}) do
     errors
-    |> Enum.map(&Elixact.Error.format/1)
-    |> Enum.join("\n")
+    |> Enum.map_join("\n", &Elixact.Error.format/1)
   end
 end

@@ -57,9 +57,10 @@ defmodule Elixact.JsonSchema.TypeMapper do
 
   # Normalize type definitions
   defp normalize_type(type) when is_atom(type) do
-    cond do
-      schema_module?(type) -> {:ref, type}
-      true -> {:type, type, []}
+    if schema_module?(type) do
+      {:ref, type}
+    else
+      {:type, type, []}
     end
   end
 
@@ -83,12 +84,10 @@ defmodule Elixact.JsonSchema.TypeMapper do
 
   # Convert normalized types
   defp convert_normalized_type(type, store) do
-    cond do
-      match?({:ref, _}, type) and schema_module?(type |> elem(1)) ->
-        handle_schema_reference(type, store)
-
-      true ->
-        convert_type(type, store)
+    if match?({:ref, _}, type) and schema_module?(type |> elem(1)) do
+      handle_schema_reference(type, store)
+    else
+      convert_type(type, store)
     end
   end
 

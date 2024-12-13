@@ -94,32 +94,15 @@ defmodule Elixact.Types do
 
   def normalize_type(type) when is_atom(type) do
     case type do
-      :string ->
-        {:type, :string, []}
+      type when type in [:string, :integer, :float, :boolean, :any] ->
+        {:type, type, []}
 
-      :integer ->
-        {:type, :integer, []}
-
-      :float ->
-        {:type, :float, []}
-
-      :boolean ->
-        {:type, :boolean, []}
-
-      :any ->
-        {:type, :any, []}
-
-      _ ->
-        cond do
-          Code.ensure_loaded?(type) and function_exported?(type, :__schema__, 1) ->
-            {:ref, type}
-
-          Code.ensure_loaded?(type) and function_exported?(type, :type_definition, 0) ->
-            type.type_definition()
-
-          true ->
-            # Assume it's a schema module but not yet loaded (could be a circular reference)
-            {:ref, type}
+      other ->
+        if Code.ensure_loaded?(other) && function_exported?(other, :type_definition, 0) do
+          other.type_definition()
+        else
+          # Assume schema module reference
+          {:ref, other}
         end
     end
   end

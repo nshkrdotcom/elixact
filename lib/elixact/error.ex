@@ -39,7 +39,7 @@ defmodule Elixact.Error do
       "user.email: invalid format"
   """
   def format(%__MODULE__{path: path, message: message}) do
-    path_str = path |> Enum.map(&to_string/1) |> Enum.join(".")
+    path_str = Enum.map_join(path, ".", &to_string/1)
     "#{path_str}: #{message}"
   end
 end

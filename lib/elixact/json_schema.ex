@@ -1,5 +1,9 @@
 defmodule Elixact.JsonSchema do
-  alias Elixact.JsonSchema.{TypeMapper, ReferenceStore}
+  @moduledoc """
+  A module for converting Elixact schema definitions into JSON Schema format.
+  Handles field types, metadata, references, and definitions generation.
+  """
+  alias Elixact.JsonSchema.{ReferenceStore, TypeMapper}
 
   def from_schema(schema) when is_atom(schema) do
     {:ok, store} = ReferenceStore.start_link()

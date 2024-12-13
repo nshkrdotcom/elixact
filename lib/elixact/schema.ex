@@ -235,15 +235,13 @@ defmodule Elixact.Schema do
 
   # Handle built-in types and references
   defp handle_type(type) when is_atom(type) do
-    cond do
-      type in [:string, :integer, :float, :boolean, :any] ->
-        quote do
-          Types.type(unquote(type))
-        end
-
+    if type in [:string, :integer, :float, :boolean, :any] do
+      quote do
+        Types.type(unquote(type))
+      end
+    else
       # Assume it's a reference
-      true ->
-        {:ref, type}
+      {:ref, type}
     end
   end
 

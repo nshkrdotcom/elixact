@@ -41,36 +41,26 @@ defmodule Elixact.Validator do
   end
 
   defp validate_fields(fields, data, path) do
-    Enum.reduce_while(fields, {:ok, %{}}, fn
-      {name, meta}, {:ok, acc} ->
-        field_path = path ++ [name]
+    Enum.reduce_while(fields, {:ok, %{}}, fn {name, meta}, {:ok, acc} ->
+      field_path = path ++ [name]
+      value = Map.get(data, name) || Map.get(data, Atom.to_string(name))
 
-        value =
-          case {Map.fetch(data, name), Map.fetch(data, Atom.to_string(name))} do
-            {{:ok, value}, _} -> {:ok, value}
-            {_, {:ok, value}} -> {:ok, value}
-            {_, _} -> :error
+      case {value, meta} do
+        {nil, %{default: default}} ->
+          {:cont, {:ok, Map.put(acc, name, default)}}
+
+        {nil, %{required: false}} ->
+          {:cont, {:ok, acc}}
+
+        {nil, _} ->
+          {:halt, {:error, Error.new(field_path, :required, "field is required")}}
+
+        {value, _} ->
+          case validate(meta.type, value, field_path) do
+            {:ok, validated} -> {:cont, {:ok, Map.put(acc, name, validated)}}
+            {:error, errors} -> {:halt, {:error, errors}}
           end
-
-        case value do
-          {:ok, value} ->
-            case validate(meta.type, value, field_path) do
-              {:ok, validated} -> {:cont, {:ok, Map.put(acc, name, validated)}}
-              {:error, errors} -> {:halt, {:error, errors}}
-            end
-
-          :error ->
-            cond do
-              Map.has_key?(meta, :default) ->
-                {:cont, {:ok, Map.put(acc, name, meta.default)}}
-
-              meta.optional == true || meta.required == false ->
-                {:cont, {:ok, acc}}
-
-              true ->
-                {:halt, {:error, Error.new(field_path, :required, "field is required")}}
-            end
-        end
+      end
     end)
   end
 
