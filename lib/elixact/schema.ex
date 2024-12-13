@@ -119,20 +119,16 @@ defmodule Elixact.Schema do
       current_constraints = Map.get(var!(field_meta), :constraints, [])
 
       var!(field_meta) =
-        Map.put(var!(field_meta), :constraints, [{:choices, unquote(values)} | current_constraints])
+        Map.put(var!(field_meta), :constraints, [
+          {:choices, unquote(values)} | current_constraints
+        ])
     end
   end
 
   # Field macro remains the same
-  defmacro field(name, type, opts \\ []) do
-    {block, _opts} =
-      Keyword.pop(
-        opts,
-        :do,
-        quote do
-        end
-      )
+  defmacro field(name, type, opts \\ [do: {:__block__, [], []}])
 
+  defmacro field(name, type, do: block) do
     quote do
       field_meta = %Elixact.FieldMeta{
         name: unquote(name),
