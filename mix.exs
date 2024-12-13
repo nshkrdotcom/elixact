@@ -18,8 +18,7 @@ defmodule Elixact.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
-      mod: {Elixact.Application, []}
+      extra_applications: [:logger]
     ]
   end
 
