@@ -26,7 +26,9 @@ defmodule Elixact.MixProject do
     [
       # For JSON handling
       {:jason, "~> 1.4"},
-      # For documentation
+
+      # Dev tools
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.29", only: :dev, runtime: false}
     ]
   end
