@@ -5,6 +5,21 @@ defmodule Elixact.Schema do
 
   alias Elixact.Types
 
+  @doc """
+  Defines a new schema with optional description.
+
+  ## Parameters
+
+    * `description` - Optional string describing the schema
+    * `do` - Block containing field definitions
+
+  ## Examples
+
+      schema "User data validation schema" do
+        field :name, :string
+        field :age, :integer
+      end
+  """
   defmacro schema(description \\ nil, do: block) do
     quote do
       @schema_description unquote(description)
@@ -25,6 +40,19 @@ defmodule Elixact.Schema do
     end
   end
 
+  @doc """
+  Adds a minimum length constraint to a string field.
+
+  ## Parameters
+
+    * `value` - The minimum length required (must be a non-negative integer)
+
+  ## Examples
+
+      field :username, :string do
+        min_length(3)
+      end
+  """
   defmacro min_length(value) do
     quote do
       current_constraints = Map.get(var!(field_meta), :constraints, [])
@@ -36,6 +64,20 @@ defmodule Elixact.Schema do
     end
   end
 
+  @doc """
+  Adds a maximum length constraint to a string field.
+
+  ## Parameters
+
+    * `value` - The maximum length allowed (must be a non-negative integer)
+
+  ## Examples
+
+      field :username, :string do
+        max_length(20)
+      end
+
+  """
   defmacro max_length(value) do
     quote do
       current_constraints = Map.get(var!(field_meta), :constraints, [])
@@ -47,6 +89,19 @@ defmodule Elixact.Schema do
     end
   end
 
+  @doc """
+  Adds a minimum items constraint to an array field.
+
+  ## Parameters
+
+    * `value` - The minimum number of items required (must be a non-negative integer)
+
+  ## Examples
+
+      field :tags, {:array, :string} do
+        min_items(1)
+      end
+  """
   defmacro min_items(value) do
     quote do
       current_constraints = Map.get(var!(field_meta), :constraints, [])
@@ -58,6 +113,19 @@ defmodule Elixact.Schema do
     end
   end
 
+  @doc """
+  Adds a maximum items constraint to an array field.
+
+  ## Parameters
+
+    * `value` - The maximum number of items allowed (must be a non-negative integer)
+
+  ## Examples
+
+      field :tags, {:array, :string} do
+        max_items(10)
+      end
+  """
   defmacro max_items(value) do
     quote do
       current_constraints = Map.get(var!(field_meta), :constraints, [])
@@ -69,6 +137,23 @@ defmodule Elixact.Schema do
     end
   end
 
+  @doc """
+  Adds a greater than constraint to a numeric field.
+
+  ## Parameters
+
+    * `value` - The minimum value (exclusive)
+
+  ## Examples
+
+      field :age, :integer do
+        gt(0)
+      end
+
+      field :score, :float do
+        gt(0.0)
+      end
+  """
   defmacro gt(value) do
     quote do
       current_constraints = Map.get(var!(field_meta), :constraints, [])
@@ -78,6 +163,23 @@ defmodule Elixact.Schema do
     end
   end
 
+  @doc """
+  Adds a less than constraint to a numeric field.
+
+  ## Parameters
+
+    * `value` - The maximum value (exclusive)
+
+  ## Examples
+
+      field :age, :integer do
+        lt(100)
+      end
+
+      field :temperature, :float do
+        lt(100.0)
+      end
+  """
   defmacro lt(value) do
     quote do
       current_constraints = Map.get(var!(field_meta), :constraints, [])
@@ -87,6 +189,19 @@ defmodule Elixact.Schema do
     end
   end
 
+  @doc """
+  Adds a greater than or equal to constraint to a numeric field.
+
+  ## Parameters
+
+    * `value` - The minimum value (inclusive)
+
+  ## Examples
+
+      field :age, :integer do
+        gteq(18)
+      end
+  """
   defmacro gteq(value) do
     quote do
       current_constraints = Map.get(var!(field_meta), :constraints, [])
@@ -96,6 +211,19 @@ defmodule Elixact.Schema do
     end
   end
 
+  @doc """
+  Adds a less than or equal to constraint to a numeric field.
+
+  ## Parameters
+
+    * `value` - The maximum value (inclusive)
+
+  ## Examples
+
+      field :rating, :float do
+        lteq(5.0)
+      end
+  """
   defmacro lteq(value) do
     quote do
       current_constraints = Map.get(var!(field_meta), :constraints, [])
@@ -105,6 +233,19 @@ defmodule Elixact.Schema do
     end
   end
 
+  @doc """
+  Adds a format constraint to a string field.
+
+  ## Parameters
+
+    * `value` - The format pattern (regular expression)
+
+  ## Examples
+
+      field :email, :string do
+        format(~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
+      end
+  """
   defmacro format(value) do
     quote do
       current_constraints = Map.get(var!(field_meta), :constraints, [])
@@ -114,6 +255,23 @@ defmodule Elixact.Schema do
     end
   end
 
+  @doc """
+  Adds an enumeration constraint, limiting values to a predefined set.
+
+  ## Parameters
+
+    * `values` - List of allowed values
+
+  ## Examples
+
+      field :status, :string do
+        choices(["pending", "active", "completed"])
+      end
+
+      field :priority, :integer do
+        choices([1, 2, 3])
+      end
+  """
   defmacro choices(values) when is_list(values) do
     quote do
       current_constraints = Map.get(var!(field_meta), :constraints, [])
@@ -125,7 +283,44 @@ defmodule Elixact.Schema do
     end
   end
 
-  # Field macro remains the same
+  @doc """
+  Defines a field in the schema with a name, type, and optional constraints.
+
+  ## Parameters
+
+    * `name` - Atom representing the field name
+    * `type` - The field's type, which can be:
+      * A built-in type (`:string`, `:integer`, `:float`, `:boolean`, `:any`)
+      * An array type (`{:array, type}`)
+      * A map type (`{:map, {key_type, value_type}}`)
+      * A union type (`{:union, [type1, type2, ...]}`)
+      * A reference to another schema (atom)
+    * `opts` - Optional block containing field constraints and metadata
+
+  ## Examples
+
+      # Simple field
+      field :name, :string
+
+      # Field with constraints
+      field :age, :integer do
+        description("User's age in years")
+        gt(0)
+        lt(150)
+      end
+
+      # Array field
+      field :tags, {:array, :string} do
+        min_items(1)
+        max_items(10)
+      end
+
+      # Map field
+      field :metadata, {:map, {:string, :any}}
+
+      # Reference to another schema
+      field :address, Address
+  """
   defmacro field(name, type, opts \\ [do: {:__block__, [], []}])
 
   defmacro field(name, type, do: block) do
@@ -161,24 +356,74 @@ defmodule Elixact.Schema do
   end
 
   # Field metadata setters
+
+  @doc """
+  Sets a description for the field.
+
+  ## Parameters
+
+    * `text` - String description of the field's purpose or usage
+
+  ## Examples
+
+      field :age, :integer do
+        description("User's age in years")
+      end
+  """
   defmacro description(text) do
     quote do
       var!(field_meta) = Map.put(var!(field_meta), :description, unquote(text))
     end
   end
 
+  @doc """
+  Sets a single example value for the field.
+
+  ## Parameters
+
+    * `value` - An example value that would be valid for this field
+
+  ## Examples
+
+      field :age, :integer do
+        example(25)
+      end
+  """
   defmacro example(value) do
     quote do
       var!(field_meta) = Map.put(var!(field_meta), :example, unquote(value))
     end
   end
 
+  @doc """
+  Sets multiple example values for the field.
+
+  ## Parameters
+
+    * `values` - List of example values that would be valid for this field
+
+  ## Examples
+
+      field :status, :string do
+        examples(["pending", "active", "completed"])
+      end
+  """
   defmacro examples(values) when is_list(values) do
     quote do
       var!(field_meta) = Map.put(var!(field_meta), :examples, unquote(values))
     end
   end
 
+  @doc """
+  Marks the field as required (this is the default behavior).
+  A required field must be present in the input data during validation.
+
+  ## Examples
+
+      field :email, :string do
+        required()
+      end
+  """
   defmacro required() do
     quote do
       var!(field_meta) =
@@ -187,6 +432,16 @@ defmodule Elixact.Schema do
     end
   end
 
+  @doc """
+  Marks the field as optional.
+  An optional field may be omitted from the input data during validation.
+
+  ## Examples
+
+      field :middle_name, :string do
+        optional()
+      end
+  """
   defmacro optional() do
     quote do
       var!(field_meta) =
@@ -195,6 +450,24 @@ defmodule Elixact.Schema do
     end
   end
 
+  @doc """
+  Sets a default value for the field and marks it as optional.
+  The default value will be used if the field is omitted from input data.
+
+  ## Parameters
+
+    * `value` - The default value to use when the field is not provided
+
+  ## Examples
+
+      field :status, :string do
+        default("pending")
+      end
+
+      field :active, :boolean do
+        default(true)
+      end
+  """
   defmacro default(value) do
     quote do
       var!(field_meta) =
@@ -246,6 +519,23 @@ defmodule Elixact.Schema do
   end
 
   # Configuration block
+
+  @doc """
+  Defines configuration settings for the schema.
+
+  Configuration options can include:
+    * title - Schema title
+    * config_description - Schema description
+    * strict - Whether to enforce strict validation
+
+  ## Examples
+
+      config do
+        title("User Schema")
+        config_description("Validates user registration data")
+        strict(true)
+      end
+  """
   defmacro config(do: block) do
     quote do
       config = %{
@@ -262,18 +552,58 @@ defmodule Elixact.Schema do
   end
 
   # Config setters
+  @doc """
+  Sets the title for the schema configuration.
+
+  ## Parameters
+
+    * `text` - String title for the schema
+
+  ## Examples
+
+      config do
+        title("User Schema")
+      end
+  """
   defmacro title(text) do
     quote do
       var!(config) = Map.put(var!(config), :title, unquote(text))
     end
   end
 
+  @doc """
+  Sets the description for the schema configuration.
+
+  ## Parameters
+
+    * `text` - String description of the schema
+
+  ## Examples
+
+      config do
+        config_description("Validates user data for registration")
+      end
+  """
   defmacro config_description(text) do
     quote do
       var!(config) = Map.put(var!(config), :description, unquote(text))
     end
   end
 
+  @doc """
+  Sets whether the schema should enforce strict validation.
+  When strict is true, unknown fields will cause validation to fail.
+
+  ## Parameters
+
+    * `bool` - Boolean indicating if strict validation should be enabled
+
+  ## Examples
+
+      config do
+        strict(true)
+      end
+  """
   defmacro strict(bool) do
     quote do
       var!(config) = Map.put(var!(config), :strict, unquote(bool))
