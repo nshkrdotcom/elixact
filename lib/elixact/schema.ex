@@ -1,9 +1,18 @@
 defmodule Elixact.Schema do
   @moduledoc """
   Schema DSL for defining data schemas with validation rules and metadata.
+
+  This module provides macros and functions for defining structured data schemas
+  with rich validation capabilities, type safety, and comprehensive error reporting.
   """
 
   alias Elixact.Types
+
+  @type schema_config :: %{
+          optional(:title) => String.t(),
+          optional(:description) => String.t(),
+          optional(:strict) => boolean()
+        }
 
   @doc """
   Defines a new schema with optional description.
@@ -478,6 +487,7 @@ defmodule Elixact.Schema do
   end
 
   # Handle type definitions
+  @spec handle_type(term()) :: Macro.t()
   defp handle_type({:array, type}) do
     quote do
       Types.array(unquote(handle_type(type)))

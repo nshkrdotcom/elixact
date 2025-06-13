@@ -1,9 +1,15 @@
 defmodule Elixact.Validator do
   @moduledoc """
   Validates values against type definitions and schemas.
+
+  This module provides the core validation logic for Elixact schemas,
+  handling field validation, constraints, and error reporting.
   """
 
   alias Elixact.Error
+
+  @type validation_result :: {:ok, term()} | {:error, Error.t() | [Error.t()]}
+  @type validation_path :: [atom() | String.t() | integer()]
 
   @doc """
   Validates data against a schema module, checking for required fields,
@@ -18,6 +24,7 @@ defmodule Elixact.Validator do
     - path: Current validation path for error messages. Defaults to `[]`.
 
   """
+  @spec validate_schema(module(), map(), validation_path()) :: validation_result()
   def validate_schema(schema, data, path \\ []) when is_atom(schema) do
     fields = schema.__schema__(:fields)
     config = schema.__schema__(:config) || %{}
@@ -29,6 +36,8 @@ defmodule Elixact.Validator do
     end
   end
 
+  @spec validate_required_fields([{atom(), Elixact.FieldMeta.t()}], map(), validation_path()) ::
+          :ok | {:error, Error.t()}
   defp validate_required_fields(fields, data, path) do
     required_fields = for {name, meta} <- fields, meta.required, do: name
 
@@ -40,6 +49,8 @@ defmodule Elixact.Validator do
     end
   end
 
+  @spec validate_fields([{atom(), Elixact.FieldMeta.t()}], map(), validation_path()) ::
+          {:ok, map()} | {:error, Error.t()}
   defp validate_fields(fields, data, path) do
     Enum.reduce_while(fields, {:ok, %{}}, fn {name, meta}, {:ok, acc} ->
       field_path = path ++ [name]
@@ -64,6 +75,7 @@ defmodule Elixact.Validator do
     end)
   end
 
+  @spec validate_strict(map(), map(), map(), validation_path()) :: :ok | {:error, Error.t()}
   defp validate_strict(%{strict: true}, validated, original, path) do
     case Map.keys(original) -- Map.keys(validated) do
       [] ->
@@ -79,6 +91,8 @@ defmodule Elixact.Validator do
   @doc """
   Validates a value against a type definition.
   """
+  @spec validate(Elixact.Types.type_definition() | module(), term(), validation_path()) ::
+          validation_result()
   def validate(type, value, path \\ [])
 
   def validate({:ref, schema}, value, path) when is_atom(schema) do
@@ -123,6 +137,7 @@ defmodule Elixact.Validator do
     validate_union(value, types, path)
   end
 
+  @spec apply_constraints(term(), [term()], validation_path()) :: validation_result()
   defp apply_constraints(value, constraints, path) do
     Enum.reduce_while(constraints, {:ok, value}, fn
       {constraint, constraint_value}, {:ok, val} ->
@@ -137,6 +152,21 @@ defmodule Elixact.Validator do
   end
 
   # String constraints
+  @spec apply_constraint(
+          :choices
+          | :format
+          | :gt
+          | :gteq
+          | :lt
+          | :lteq
+          | :max_items
+          | :max_length
+          | :min_items
+          | :min_length
+          | :size?,
+          term(),
+          term()
+        ) :: boolean()
   defp apply_constraint(:min_length, value, min) when is_binary(value) do
     String.length(value) >= min
   end
@@ -188,6 +218,12 @@ defmodule Elixact.Validator do
   end
 
   # Array validation
+  @spec validate_array_items(
+          [term()],
+          Elixact.Types.type_definition(),
+          [term()],
+          validation_path()
+        ) :: validation_result()
   defp validate_array_items(items, type, constraints, path) do
     results =
       items
@@ -215,6 +251,13 @@ defmodule Elixact.Validator do
     end
   end
 
+  @spec validate_map(
+          term(),
+          Elixact.Types.type_definition(),
+          Elixact.Types.type_definition(),
+          [term()],
+          validation_path()
+        ) :: validation_result()
   defp validate_map(value, key_type, value_type, constraints, path) when is_map(value) do
     results =
       Enum.map(value, fn {k, v} ->
@@ -244,6 +287,8 @@ defmodule Elixact.Validator do
     {:error, [Error.new(path, :type, "expected map, got #{inspect(value)}")]}
   end
 
+  @spec validate_union(term(), [Elixact.Types.type_definition()], validation_path()) ::
+          validation_result()
   defp validate_union(value, types, path) do
     results =
       Enum.map(types, &validate(&1, value, path))

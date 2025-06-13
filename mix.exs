@@ -12,7 +12,8 @@ defmodule Elixact.MixProject do
       deps: deps(),
       description: "Schema definition and validation library for Elixir",
       package: package(),
-      docs: docs()
+      docs: docs(),
+      dialyzer: dialyzer()
     ]
   end
 
@@ -29,6 +30,7 @@ defmodule Elixact.MixProject do
 
       # Dev tools
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.29", only: :dev, runtime: false}
     ]
   end
@@ -48,6 +50,18 @@ defmodule Elixact.MixProject do
       source_url: @source_url,
       extras: [
         "README.md"
+      ]
+    ]
+  end
+
+  defp dialyzer do
+    [
+      plt_add_apps: [:mix],
+      flags: [
+        :error_handling,
+        :underspecs,
+        :unknown,
+        :unmatched_returns
       ]
     ]
   end

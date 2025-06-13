@@ -5,6 +5,9 @@ defmodule Elixact.JsonSchema do
   """
   alias Elixact.JsonSchema.{ReferenceStore, TypeMapper}
 
+  @type json_schema :: %{String.t() => term()}
+
+  @spec from_schema(module()) :: json_schema()
   def from_schema(schema) when is_atom(schema) do
     {:ok, store} = ReferenceStore.start_link()
 
@@ -28,6 +31,7 @@ defmodule Elixact.JsonSchema do
     end
   end
 
+  @spec process_referenced_schemas(pid()) :: :ok
   defp process_referenced_schemas(store) do
     # Get all references that need to be processed
     references = ReferenceStore.get_references(store)
@@ -40,6 +44,7 @@ defmodule Elixact.JsonSchema do
     end)
   end
 
+  @spec generate_schema(module(), pid()) :: json_schema()
   defp generate_schema(schema, store) do
     # Get schema config
     config = schema.__schema__(:config) || %{}
@@ -90,12 +95,14 @@ defmodule Elixact.JsonSchema do
     schema_with_fields
   end
 
+  @spec maybe_add_additional_properties(json_schema(), term()) :: json_schema()
   defp maybe_add_additional_properties(schema, strict) when is_boolean(strict) do
     Map.put(schema, "additionalProperties", not strict)
   end
 
   defp maybe_add_additional_properties(schema, _), do: schema
 
+  @spec convert_field_metadata(Elixact.FieldMeta.t()) :: map()
   defp convert_field_metadata(field_meta) do
     base = %{
       "description" => field_meta.description,

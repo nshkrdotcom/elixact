@@ -51,12 +51,20 @@ defmodule Elixact.Types do
   alias Elixact.Error
 
   # Basic types
+  @spec string() :: {:type, :string, []}
   def string, do: {:type, :string, []}
+
+  @spec integer() :: {:type, :integer, []}
   def integer, do: {:type, :integer, []}
+
+  @spec float() :: {:type, :float, []}
   def float, do: {:type, :float, []}
+
+  @spec boolean() :: {:type, :boolean, []}
   def boolean, do: {:type, :boolean, []}
 
   # Basic type constructor
+  @spec type(atom()) :: {:type, atom(), []}
   def type(name) when is_atom(name) do
     case name do
       :string -> string()
@@ -68,22 +76,29 @@ defmodule Elixact.Types do
   end
 
   # Complex types
+  @spec array(type_definition()) :: {:array, type_definition(), []}
   def array(inner_type) do
     normalized = normalize_type(inner_type)
     {:array, normalized, []}
   end
 
+  @spec map(type_definition(), type_definition()) ::
+          {:map, {type_definition(), type_definition()}, []}
   def map(key_type, value_type) do
     normalized_key = normalize_type(key_type)
     normalized_value = normalize_type(value_type)
     {:map, {normalized_key, normalized_value}, []}
   end
 
+  @spec union([type_definition()]) :: {:union, [type_definition()], []}
   def union(types) when is_list(types), do: {:union, types, []}
+
   # Type reference
+  @spec ref(atom()) :: {:ref, atom()}
   def ref(schema), do: {:ref, schema}
 
   # Helper to normalize type definitions
+  @spec normalize_type(term()) :: type_definition()
   def normalize_type({:map, {key_type, value_type}}) do
     {:map, {normalize_type(key_type), normalize_type(value_type)}, []}
   end
@@ -110,6 +125,7 @@ defmodule Elixact.Types do
   def normalize_type(other), do: other
 
   # Add coercion helpers
+  @spec coerce(atom(), term()) :: {:ok, term()} | {:error, String.t()}
   def coerce(:string, value) when is_integer(value), do: {:ok, Integer.to_string(value)}
   def coerce(:string, value) when is_float(value), do: {:ok, Float.to_string(value)}
 
@@ -130,6 +146,7 @@ defmodule Elixact.Types do
   def coerce(_, value), do: {:error, "cannot coerce #{inspect(value)}"}
 
   # Type constraints
+  @spec with_constraints(type_definition(), [term()]) :: {atom(), term(), [term()]}
   def with_constraints(type, constraints) do
     case type do
       {:type, name, existing} -> {:type, name, existing ++ constraints}
@@ -138,6 +155,7 @@ defmodule Elixact.Types do
   end
 
   # Validation functions
+  @spec validate(atom(), term()) :: {:ok, term()} | {:error, Elixact.Error.t()}
   def validate(:string, value) when is_binary(value), do: {:ok, value}
 
   def validate(:string, value),

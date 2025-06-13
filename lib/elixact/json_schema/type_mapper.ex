@@ -1,10 +1,14 @@
 defmodule Elixact.JsonSchema.TypeMapper do
   @moduledoc """
   Converts Elixact type definitions to JSON Schema type definitions.
+
+  This module handles the conversion between Elixact's internal type system
+  and JSON Schema representations, including complex types and constraints.
   """
 
   alias Elixact.JsonSchema.ReferenceStore
 
+  @spec to_json_schema(Elixact.Types.type_definition() | module(), pid() | nil) :: map()
   def to_json_schema(type, store \\ nil)
 
   def to_json_schema(type, store) do
@@ -30,10 +34,12 @@ defmodule Elixact.JsonSchema.TypeMapper do
     end
   end
 
+  @spec schema_module?(module()) :: boolean()
   defp schema_module?(module) do
     Code.ensure_loaded?(module) and function_exported?(module, :__schema__, 1)
   end
 
+  @spec handle_schema_reference({:ref, atom()}, pid()) :: %{String.t() => String.t()}
   defp handle_schema_reference({:ref, module}, store) when is_atom(module) do
     if store do
       ReferenceStore.add_reference(store, module)
@@ -43,6 +49,7 @@ defmodule Elixact.JsonSchema.TypeMapper do
     end
   end
 
+  @spec apply_type_module(module()) :: map()
   defp apply_type_module(module) do
     if custom_type?(module) do
       module.json_schema()
@@ -51,11 +58,13 @@ defmodule Elixact.JsonSchema.TypeMapper do
     end
   end
 
+  @spec custom_type?(module()) :: boolean()
   defp custom_type?(module) do
     Code.ensure_loaded?(module) and function_exported?(module, :json_schema, 0)
   end
 
   # Normalize type definitions
+  @spec normalize_type(term()) :: Elixact.Types.type_definition()
   defp normalize_type(type) when is_atom(type) do
     if schema_module?(type) do
       {:ref, type}
@@ -83,6 +92,7 @@ defmodule Elixact.JsonSchema.TypeMapper do
   defp normalize_type(type), do: type
 
   # Convert normalized types
+  @spec convert_normalized_type(Elixact.Types.type_definition(), pid() | nil) :: map()
   defp convert_normalized_type(type, store) do
     if match?({:ref, _}, type) and schema_module?(type |> elem(1)) do
       handle_schema_reference(type, store)
@@ -91,6 +101,7 @@ defmodule Elixact.JsonSchema.TypeMapper do
     end
   end
 
+  @spec convert_type(Elixact.Types.type_definition(), pid() | nil) :: map()
   defp convert_type({:type, base_type, constraints}, _store) do
     map_basic_type(base_type)
     |> apply_constraints(constraints)
@@ -109,6 +120,7 @@ defmodule Elixact.JsonSchema.TypeMapper do
   end
 
   # Basic type mapping
+  @spec map_basic_type(atom()) :: %{String.t() => String.t()}
   defp map_basic_type(:string), do: %{"type" => "string"}
   defp map_basic_type(:integer), do: %{"type" => "integer"}
   defp map_basic_type(:float), do: %{"type" => "number"}
@@ -120,6 +132,7 @@ defmodule Elixact.JsonSchema.TypeMapper do
   end
 
   # Array type mapping
+  @spec map_array_type(Elixact.Types.type_definition(), [term()], pid() | nil) :: map()
   defp map_array_type(inner_type, constraints, store) do
     base = %{
       "type" => "array",
@@ -130,6 +143,12 @@ defmodule Elixact.JsonSchema.TypeMapper do
   end
 
   # Map type mapping
+  @spec map_map_type(
+          Elixact.Types.type_definition(),
+          Elixact.Types.type_definition(),
+          [term()],
+          pid() | nil
+        ) :: map()
   defp map_map_type(_key_type, value_type, constraints, store) do
     base = %{
       "type" => "object",
@@ -140,6 +159,7 @@ defmodule Elixact.JsonSchema.TypeMapper do
   end
 
   # Union type mapping
+  @spec map_union_type([Elixact.Types.type_definition()], [term()], pid() | nil) :: map()
   defp map_union_type(types, constraints, store) do
     base = %{
       "oneOf" => Enum.map(types, &to_json_schema(&1, store))
@@ -149,6 +169,7 @@ defmodule Elixact.JsonSchema.TypeMapper do
   end
 
   # Constraint mapping
+  @spec apply_constraints(map(), [term()]) :: map()
   defp apply_constraints(schema, constraints) do
     Enum.reduce(constraints, schema, fn
       {:min_length, value}, acc -> Map.put(acc, "minLength", value)
