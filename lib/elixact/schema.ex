@@ -508,7 +508,7 @@ defmodule Elixact.Schema do
       end
   """
   @spec examples([term()]) :: Macro.t()
-  defmacro examples(values) when is_list(values) do
+  defmacro examples(values) do
     quote do
       var!(field_meta) = Map.put(var!(field_meta), :examples, unquote(values))
     end

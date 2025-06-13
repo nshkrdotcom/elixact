@@ -102,18 +102,22 @@ defmodule Elixact.JsonSchema.TypeMapper do
   end
 
   @spec convert_type(Elixact.Types.type_definition(), pid() | nil) :: map()
-  defp convert_type({:type, base_type, constraints}, _store) do
+  defp convert_type({:type, base_type, constraints}, store) do
     case base_type do
       type when type in [:string, :integer, :float, :boolean] ->
         map_basic_type(base_type)
         |> apply_constraints(constraints)
 
       module when is_atom(module) ->
-        # Handle custom type modules
-        if custom_type?(module) do
-          apply_type_module(module)
+        # Handle schema modules or custom type modules
+        if schema_module?(module) do
+          handle_schema_reference({:ref, module}, store)
         else
-          raise "Module #{inspect(module)} is not a valid Elixact type"
+          if custom_type?(module) do
+            apply_type_module(module)
+          else
+            raise "Module #{inspect(module)} is not a valid Elixact type"
+          end
         end
     end
   end
@@ -128,6 +132,11 @@ defmodule Elixact.JsonSchema.TypeMapper do
 
   defp convert_type({:union, types, constraints}, store) do
     map_union_type(types, constraints, store)
+  end
+
+  # Catch-all for invalid type definitions
+  defp convert_type(invalid_type, _store) do
+    raise ArgumentError, "Invalid type definition: #{inspect(invalid_type)}"
   end
 
   # Basic type mapping

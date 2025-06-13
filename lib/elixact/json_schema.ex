@@ -66,6 +66,11 @@ defmodule Elixact.JsonSchema do
 
   @spec generate_schema(module(), pid()) :: json_schema()
   defp generate_schema(schema, store) do
+    # Check if the module has the required __schema__ function
+    unless function_exported?(schema, :__schema__, 1) do
+      raise ArgumentError, "Module #{inspect(schema)} is not a valid Elixact schema"
+    end
+
     # Get schema config
     config = schema.__schema__(:config) || %{}
 
