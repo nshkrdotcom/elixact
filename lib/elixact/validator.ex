@@ -328,8 +328,33 @@ defmodule Elixact.Validator do
       Enum.map(types, &validate(&1, value, path))
 
     case Enum.find(results, &match?({:ok, _}, &1)) do
-      {:ok, validated} -> {:ok, validated}
-      nil -> {:error, [Error.new(path, :type, "value did not match any type in union")]}
+      {:ok, validated} ->
+        {:ok, validated}
+
+      nil ->
+        # If no type matches, return the most detailed error (the one with the longest path)
+        detailed_errors =
+          results
+          |> Enum.flat_map(fn
+            {:error, errors} when is_list(errors) -> errors
+            {:error, error} -> [error]
+            _ -> []
+          end)
+
+        case detailed_errors do
+          [] ->
+            {:error, [Error.new(path, :type, "value did not match any type in union")]}
+
+          errors ->
+            # Return the error with the most detailed path (longest path indicates deeper validation)
+            best_error = Enum.max_by(errors, fn error -> length(error.path) end)
+
+            if length(best_error.path) > length(path) do
+              {:error, [best_error]}
+            else
+              {:error, [Error.new(path, :type, "value did not match any type in union")]}
+            end
+        end
     end
   end
 end

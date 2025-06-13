@@ -111,8 +111,8 @@ defmodule Elixact.JsonSchema.ReferenceStore do
     cond do
       is_atom(module) ->
         # Handle plain atoms by converting to string and extracting last part
-        module 
-        |> Atom.to_string() 
+        module
+        |> Atom.to_string()
         |> String.replace_prefix("Elixir.", "")
         |> String.split(".")
         |> List.last()
