@@ -51,11 +51,23 @@ defmodule Elixact do
   """
 
   @doc """
-  Configures a module to be a Elixact schema.
+  Configures a module to be an Elixact schema.
 
   This macro sets up the necessary module attributes and imports
   the schema DSL functions.
+
+  ## Examples
+
+      defmodule UserSchema do
+        use Elixact
+
+        schema "User data" do
+          field :name, :string
+          field :age, :integer
+        end
+      end
   """
+  @spec __using__(keyword()) :: Macro.t()
   defmacro __using__(_opts) do
     quote do
       import Elixact.Schema
@@ -70,6 +82,7 @@ defmodule Elixact do
     end
   end
 
+  @spec __before_compile__(Macro.Env.t()) :: Macro.t()
   defmacro __before_compile__(_env) do
     quote do
       def __schema__(:description), do: @schema_description

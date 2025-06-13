@@ -7,6 +7,26 @@ defmodule Elixact.JsonSchema do
 
   @type json_schema :: %{String.t() => term()}
 
+  @doc """
+  Converts an Elixact schema module to a JSON Schema representation.
+
+  ## Parameters
+    * `schema` - The schema module to convert
+
+  ## Returns
+    * A map representing the JSON Schema
+
+  ## Examples
+
+      iex> defmodule TestSchema do
+      ...>   use Elixact
+      ...>   schema do
+      ...>     field :name, :string
+      ...>   end
+      ...> end
+      iex> Elixact.JsonSchema.from_schema(TestSchema)
+      %{"type" => "object", "properties" => %{"name" => %{"type" => "string"}}}
+  """
   @spec from_schema(module()) :: json_schema()
   def from_schema(schema) when is_atom(schema) do
     {:ok, store} = ReferenceStore.start_link()

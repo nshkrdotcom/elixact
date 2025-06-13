@@ -98,6 +98,23 @@ defmodule Elixact.Types do
   def ref(schema), do: {:ref, schema}
 
   # Helper to normalize type definitions
+  @doc """
+  Normalizes a type definition to the standard internal format.
+
+  ## Parameters
+    * `type` - The type definition to normalize
+
+  ## Returns
+    * A normalized type definition tuple
+
+  ## Examples
+
+      iex> Elixact.Types.normalize_type(:string)
+      {:type, :string, []}
+
+      iex> Elixact.Types.normalize_type({:array, :integer})
+      {:array, {:type, :integer, []}, []}
+  """
   @spec normalize_type(term()) :: type_definition()
   def normalize_type({:map, {key_type, value_type}}) do
     {:map, {normalize_type(key_type), normalize_type(value_type)}, []}
@@ -124,7 +141,28 @@ defmodule Elixact.Types do
 
   def normalize_type(other), do: other
 
-  # Add coercion helpers
+  @doc """
+  Coerces a value to the specified type.
+
+  ## Parameters
+    * `type` - The target type to coerce to
+    * `value` - The value to coerce
+
+  ## Returns
+    * `{:ok, coerced_value}` on success
+    * `{:error, reason}` on failure
+
+  ## Examples
+
+      iex> Elixact.Types.coerce(:string, 42)
+      {:ok, "42"}
+
+      iex> Elixact.Types.coerce(:integer, "123")
+      {:ok, 123}
+
+      iex> Elixact.Types.coerce(:integer, "abc")
+      {:error, "invalid integer format"}
+  """
   @spec coerce(atom(), term()) :: {:ok, term()} | {:error, String.t()}
   def coerce(:string, value) when is_integer(value), do: {:ok, Integer.to_string(value)}
   def coerce(:string, value) when is_float(value), do: {:ok, Float.to_string(value)}
@@ -145,7 +183,22 @@ defmodule Elixact.Types do
 
   def coerce(_, value), do: {:error, "cannot coerce #{inspect(value)}"}
 
-  # Type constraints
+  @doc """
+  Adds constraints to a type definition.
+
+  ## Parameters
+    * `type` - The type definition to add constraints to
+    * `constraints` - List of constraints to add
+
+  ## Returns
+    * Updated type definition with constraints
+
+  ## Examples
+
+      iex> string_type = Elixact.Types.string()
+      iex> Elixact.Types.with_constraints(string_type, [min_length: 3, max_length: 10])
+      {:type, :string, [min_length: 3, max_length: 10]}
+  """
   @spec with_constraints(type_definition(), [term()]) :: {atom(), term(), [term()]}
   def with_constraints(type, constraints) do
     case type do
@@ -154,7 +207,25 @@ defmodule Elixact.Types do
     end
   end
 
-  # Validation functions
+  @doc """
+  Validates a value against a basic type.
+
+  ## Parameters
+    * `type` - The type to validate against
+    * `value` - The value to validate
+
+  ## Returns
+    * `{:ok, value}` if validation succeeds
+    * `{:error, Elixact.Error.t()}` if validation fails
+
+  ## Examples
+
+      iex> Elixact.Types.validate(:string, "hello")
+      {:ok, "hello"}
+
+      iex> Elixact.Types.validate(:integer, "not a number")
+      {:error, %Elixact.Error{path: [], code: :type, message: "expected integer, got \"not a number\""}}
+  """
   @spec validate(atom(), term()) :: {:ok, term()} | {:error, Elixact.Error.t()}
   def validate(:string, value) when is_binary(value), do: {:ok, value}
 

@@ -11,6 +11,17 @@ defmodule Elixact.JsonSchema.ReferenceStore do
           definitions: %{String.t() => map()}
         }
 
+  @doc """
+  Starts a new reference store process.
+
+  ## Returns
+    * `{:ok, pid}` on success
+
+  ## Examples
+
+      iex> {:ok, store} = Elixact.JsonSchema.ReferenceStore.start_link()
+      {:ok, #PID<...>}
+  """
   @spec start_link() :: {:ok, pid()}
   def start_link do
     Agent.start_link(fn ->
@@ -21,11 +32,35 @@ defmodule Elixact.JsonSchema.ReferenceStore do
     end)
   end
 
+  @doc """
+  Stops the reference store process.
+
+  ## Parameters
+    * `agent` - The reference store process PID
+
+  ## Examples
+
+      iex> {:ok, store} = Elixact.JsonSchema.ReferenceStore.start_link()
+      iex> Elixact.JsonSchema.ReferenceStore.stop(store)
+      :ok
+  """
   @spec stop(pid()) :: :ok
   def stop(agent) do
     Agent.stop(agent)
   end
 
+  @doc """
+  Adds a schema module reference to track for processing.
+
+  ## Parameters
+    * `agent` - The reference store process PID
+    * `module` - The schema module to add as a reference
+
+  ## Examples
+
+      iex> Elixact.JsonSchema.ReferenceStore.add_reference(store, MySchema)
+      :ok
+  """
   @spec add_reference(pid(), module()) :: :ok
   def add_reference(agent, module) when is_atom(module) do
     Agent.update(agent, fn state ->
@@ -73,8 +108,20 @@ defmodule Elixact.JsonSchema.ReferenceStore do
 
   @spec module_name(module()) :: String.t()
   defp module_name(module) do
-    module
-    |> Module.split()
-    |> List.last()
+    cond do
+      is_atom(module) ->
+        # Handle plain atoms by converting to string and extracting last part
+        module 
+        |> Atom.to_string() 
+        |> String.replace_prefix("Elixir.", "")
+        |> String.split(".")
+        |> List.last()
+
+      true ->
+        # Handle actual modules
+        module
+        |> Module.split()
+        |> List.last()
+    end
   end
 end

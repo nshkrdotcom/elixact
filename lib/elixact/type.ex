@@ -17,6 +17,37 @@ defmodule Elixact.Type do
 
   @optional_callbacks coerce_rule: 0, custom_rules: 0
 
+  @doc """
+  Provides functionality for defining custom types in Elixact schemas.
+
+  When you `use Elixact.Type`, your module gets:
+  - The `Elixact.Type` behaviour
+  - Import of `Elixact.Types` functions
+  - Type aliases for coercion functions
+  - A default implementation of validation with coercion support
+
+  ## Examples
+
+      defmodule MyApp.Types.Email do
+        use Elixact.Type
+
+        def type_definition do
+          {:type, :string, [format: ~r/^[^@]+@[^@]+\.[^@]+$/]}
+        end
+
+        def json_schema do
+          %{"type" => "string", "format" => "email"}
+        end
+
+        def validate(value) do
+          case type_definition() |> Elixact.Validator.validate(value) do
+            {:ok, validated} -> {:ok, validated}
+            {:error, _} -> {:error, "invalid email format"}
+          end
+        end
+      end
+  """
+  @spec __using__(keyword()) :: Macro.t()
   defmacro __using__(_opts) do
     quote do
       @behaviour Elixact.Type

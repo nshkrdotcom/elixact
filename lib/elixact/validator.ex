@@ -15,14 +15,25 @@ defmodule Elixact.Validator do
   Validates data against a schema module, checking for required fields,
   field-level validations, and strict mode constraints if enabled.
 
-  Returns {:ok, validated_data} on success or {:error, error} on validation failures.
-
   ## Parameters
+    * `schema` - Schema module to validate against
+    * `data` - Data to validate (map)
+    * `path` - Current validation path for error messages (defaults to `[]`)
 
-    - schema: Schema module to validate against
-    - data: Data to validate
-    - path: Current validation path for error messages. Defaults to `[]`.
+  ## Returns
+    * `{:ok, validated_data}` on success
+    * `{:error, errors}` on validation failures
 
+  ## Examples
+
+      iex> defmodule TestSchema do
+      ...>   use Elixact
+      ...>   schema do
+      ...>     field :name, :string
+      ...>   end
+      ...> end
+      iex> Elixact.Validator.validate_schema(TestSchema, %{name: "John"})
+      {:ok, %{name: "John"}}
   """
   @spec validate_schema(module(), map(), validation_path()) :: validation_result()
   def validate_schema(schema, data, path \\ []) when is_atom(schema) do
@@ -90,6 +101,23 @@ defmodule Elixact.Validator do
 
   @doc """
   Validates a value against a type definition.
+
+  ## Parameters
+    * `type` - The type definition or schema module to validate against
+    * `value` - The value to validate
+    * `path` - Current validation path for error messages (defaults to `[]`)
+
+  ## Returns
+    * `{:ok, validated_value}` on success
+    * `{:error, errors}` on validation failures
+
+  ## Examples
+
+      iex> Elixact.Validator.validate({:type, :string, []}, "hello")
+      {:ok, "hello"}
+
+      iex> Elixact.Validator.validate({:type, :integer, []}, "not a number")
+      {:error, %Elixact.Error{...}}
   """
   @spec validate(Elixact.Types.type_definition() | module(), term(), validation_path()) ::
           validation_result()
@@ -215,6 +243,12 @@ defmodule Elixact.Validator do
   # Choices constraint
   defp apply_constraint(:choices, value, allowed_values) do
     value in allowed_values
+  end
+
+  # Handle unknown constraints gracefully
+  defp apply_constraint(_constraint, _value, _constraint_value) do
+    # Unknown constraints pass through
+    true
   end
 
   # Array validation

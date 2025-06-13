@@ -30,4 +30,26 @@ defmodule Elixact.FieldMeta do
           default: term() | nil,
           constraints: [term()] | nil
         }
+
+  @doc """
+  Creates a new FieldMeta struct with the given parameters.
+
+  ## Parameters
+    * `name` - The field name (atom)
+    * `type` - The field type definition
+    * `required` - Whether the field is required (boolean)
+
+  ## Examples
+
+      iex> Elixact.FieldMeta.new(:email, {:type, :string, []}, true)
+      %Elixact.FieldMeta{name: :email, type: {:type, :string, []}, required: true}
+  """
+  @spec new(atom(), Elixact.Types.type_definition(), boolean()) :: t()
+  def new(name, type, required) do
+    %__MODULE__{
+      name: name,
+      type: type,
+      required: required
+    }
+  end
 end
