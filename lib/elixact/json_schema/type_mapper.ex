@@ -103,8 +103,19 @@ defmodule Elixact.JsonSchema.TypeMapper do
 
   @spec convert_type(Elixact.Types.type_definition(), pid() | nil) :: map()
   defp convert_type({:type, base_type, constraints}, _store) do
-    map_basic_type(base_type)
-    |> apply_constraints(constraints)
+    case base_type do
+      type when type in [:string, :integer, :float, :boolean] ->
+        map_basic_type(base_type)
+        |> apply_constraints(constraints)
+
+      module when is_atom(module) ->
+        # Handle custom type modules
+        if custom_type?(module) do
+          apply_type_module(module)
+        else
+          raise "Module #{inspect(module)} is not a valid Elixact type"
+        end
+    end
   end
 
   defp convert_type({:array, inner_type, constraints}, store) do
@@ -120,16 +131,11 @@ defmodule Elixact.JsonSchema.TypeMapper do
   end
 
   # Basic type mapping
-  @spec map_basic_type(atom()) :: %{String.t() => String.t()}
+  @spec map_basic_type(:string | :integer | :float | :boolean) :: %{String.t() => String.t()}
   defp map_basic_type(:string), do: %{"type" => "string"}
   defp map_basic_type(:integer), do: %{"type" => "integer"}
   defp map_basic_type(:float), do: %{"type" => "number"}
   defp map_basic_type(:boolean), do: %{"type" => "boolean"}
-
-  defp map_basic_type(module) when is_atom(module) do
-    name = module |> Module.split() |> List.last()
-    %{"$ref" => "#/definitions/#{name}"}
-  end
 
   # Array type mapping
   @spec map_array_type(Elixact.Types.type_definition(), [term()], pid() | nil) :: map()

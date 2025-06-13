@@ -111,17 +111,33 @@ defmodule Elixact.JsonSchema.ReferenceStore do
     cond do
       is_atom(module) ->
         # Handle plain atoms by converting to string and extracting last part
-        module
-        |> Atom.to_string()
-        |> String.replace_prefix("Elixir.", "")
-        |> String.split(".")
-        |> List.last()
+        module_string =
+          module
+          |> Atom.to_string()
+          |> String.replace_prefix("Elixir.", "")
+
+        # For atoms with special characters that can't be split by Module.split,
+        # we need to handle them differently
+        case String.split(module_string, ".") do
+          [single_name] -> single_name
+          parts -> List.last(parts)
+        end
 
       true ->
         # Handle actual modules
-        module
-        |> Module.split()
-        |> List.last()
+        try do
+          module
+          |> Module.split()
+          |> List.last()
+        rescue
+          ArgumentError ->
+            # If Module.split fails, fall back to atom string conversion
+            module
+            |> Atom.to_string()
+            |> String.replace_prefix("Elixir.", "")
+            |> String.split(".")
+            |> List.last()
+        end
     end
   end
 end
