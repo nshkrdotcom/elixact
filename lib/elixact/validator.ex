@@ -37,13 +37,18 @@ defmodule Elixact.Validator do
   """
   @spec validate_schema(module(), map(), validation_path()) :: validation_result()
   def validate_schema(schema, data, path \\ []) when is_atom(schema) do
-    fields = schema.__schema__(:fields)
-    config = schema.__schema__(:config) || %{}
+    # Schema validation only works with maps
+    if is_map(data) do
+      fields = schema.__schema__(:fields)
+      config = schema.__schema__(:config) || %{}
 
-    with :ok <- validate_required_fields(fields, data, path),
-         {:ok, validated} <- validate_fields(fields, data, path),
-         :ok <- validate_strict(config, validated, data, path) do
-      {:ok, validated}
+      with :ok <- validate_required_fields(fields, data, path),
+           {:ok, validated} <- validate_fields(fields, data, path),
+           :ok <- validate_strict(config, validated, data, path) do
+        {:ok, validated}
+      end
+    else
+      {:error, Error.new(path, :type, "expected map for schema validation, got #{inspect(data)}")}
     end
   end
 
@@ -132,6 +137,13 @@ defmodule Elixact.Validator do
 
   defp do_validate(schema, value, path) when is_atom(schema) do
     cond do
+      # Check if it's a basic type first (like :atom, :string, :integer, etc.)
+      schema in [:string, :integer, :float, :boolean, :any, :atom] ->
+        case Elixact.Types.validate(schema, value) do
+          {:ok, validated} -> {:ok, validated}
+          {:error, error} -> {:error, %{error | path: path ++ error.path}}
+        end
+
       Code.ensure_loaded?(schema) and function_exported?(schema, :__schema__, 1) ->
         validate_schema(schema, value, path)
 
