@@ -82,10 +82,10 @@ defmodule Elixact.JsonSchema.TypeMapper do
       # Check for basic types first
       type in [:string, :integer, :float, :boolean, :any, :atom] ->
         {:type, type, []}
-      
+
       schema_module?(type) ->
         {:ref, type}
-      
+
       true ->
         {:type, type, []}
     end
@@ -171,12 +171,17 @@ defmodule Elixact.JsonSchema.TypeMapper do
   # Unhandled patterns will raise a FunctionClauseError at runtime, making issues obvious during testing.
 
   # Basic type mapping
-  @spec map_basic_type(:string | :integer | :float | :boolean | :atom | :any) :: %{optional(String.t()) => String.t()}
+  @spec map_basic_type(:string | :integer | :float | :boolean | :atom | :any) :: %{
+          optional(String.t()) => String.t()
+        }
   defp map_basic_type(:string), do: %{"type" => "string"}
   defp map_basic_type(:integer), do: %{"type" => "integer"}
   defp map_basic_type(:float), do: %{"type" => "number"}
   defp map_basic_type(:boolean), do: %{"type" => "boolean"}
-  defp map_basic_type(:atom), do: %{"type" => "string", "description" => "Atom value (represented as string in JSON)"}
+
+  defp map_basic_type(:atom),
+    do: %{"type" => "string", "description" => "Atom value (represented as string in JSON)"}
+
   defp map_basic_type(:any), do: %{}
 
   # Array type mapping
