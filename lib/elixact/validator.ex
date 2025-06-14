@@ -247,6 +247,30 @@ defmodule Elixact.Validator do
     error_messages = extract_error_messages(constraints)
 
     Enum.reduce_while(constraints, {:ok, value}, fn
+      # Handle custom validator functions first
+      {:validator, validator_fn}, {:ok, val} ->
+        case validator_fn.(val) do
+          {:ok, validated_val} ->
+            {:cont, {:ok, validated_val}}
+
+          {:error, message} ->
+            {:halt, {:error, Error.new(path, :custom_validation, message)}}
+
+          other ->
+            {:halt,
+             {:error,
+              Error.new(
+                path,
+                :custom_validation,
+                "Custom validator returned invalid format: #{inspect(other)}"
+              )}}
+        end
+
+      # Skip error message constraints - they're already processed
+      {:error_message, _, _}, {:ok, val} ->
+        {:cont, {:ok, val}}
+
+      # Handle regular constraints
       {constraint, constraint_value}, {:ok, val} ->
         case apply_constraint(constraint, val, constraint_value) do
           true ->
@@ -257,9 +281,9 @@ defmodule Elixact.Validator do
             {:halt, {:error, Error.new(path, constraint, message)}}
         end
 
-      # Skip error message constraints - they're already processed
-      {:error_message, _, _}, {:ok, val} ->
-        {:cont, {:ok, val}}
+      # Handle any other case
+      _, acc ->
+        {:cont, acc}
     end)
   end
 

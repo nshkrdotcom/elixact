@@ -331,6 +331,36 @@ defmodule Elixact.Types do
   end
 
   @doc """
+  Adds a custom validation function to a type definition.
+
+  ## Parameters
+    * `type` - The type definition to add the custom validator to
+    * `validator_fn` - A function that takes a value and returns {:ok, value} | {:error, message}
+
+  ## Returns
+    * Updated type definition with custom validator
+
+  ## Examples
+
+      iex> email_type = Elixact.Types.string()
+      iex> |> Elixact.Types.with_constraints([min_length: 3])
+      iex> |> Elixact.Types.with_validator(fn value ->
+      iex>      if String.contains?(value, "@"), do: {:ok, value}, else: {:error, "Must contain @"}
+      iex>    end)
+      {:type, :string, [min_length: 3, {:validator, #Function<...>}]}
+  """
+  @spec with_validator(type_definition(), (term() -> {:ok, term()} | {:error, String.t()})) ::
+          {atom(), term(), [term()]}
+  def with_validator(type, validator_fn) when is_function(validator_fn, 1) do
+    validator_constraint = {:validator, validator_fn}
+
+    case type do
+      {:type, name, existing} -> {:type, name, existing ++ [validator_constraint]}
+      {kind, inner, existing} -> {kind, inner, existing ++ [validator_constraint]}
+    end
+  end
+
+  @doc """
   Validates a value against a basic type.
 
   ## Parameters
