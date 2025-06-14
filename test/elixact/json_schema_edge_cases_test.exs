@@ -2,6 +2,48 @@ defmodule Elixact.JsonSchemaEdgeCasesTest do
   use ExUnit.Case, async: true
   alias Elixact.JsonSchema
 
+  defmodule AddressSchema do
+    use Elixact
+
+    schema do
+      field(:street, :string)
+      field(:city, :string)
+
+      field :residents, {:array, Elixact.JsonSchemaEdgeCasesTest.PersonSchema} do
+        optional()
+      end
+    end
+  end
+
+  defmodule CompanySchema do
+    use Elixact
+
+    schema do
+      field(:name, :string)
+      field(:address, Elixact.JsonSchemaEdgeCasesTest.AddressSchema)
+
+      field :employees, {:array, Elixact.JsonSchemaEdgeCasesTest.PersonSchema} do
+        optional()
+      end
+    end
+  end
+
+  defmodule PersonSchema do
+    use Elixact
+
+    schema do
+      field(:name, :string)
+
+      field :address, Elixact.JsonSchemaEdgeCasesTest.AddressSchema do
+        optional()
+      end
+
+      field :company, Elixact.JsonSchemaEdgeCasesTest.CompanySchema do
+        optional()
+      end
+    end
+  end
+
   describe "JSON Schema generation edge cases" do
     test "handles schema with no fields" do
       defmodule EmptyJsonSchema do
@@ -69,49 +111,7 @@ defmodule Elixact.JsonSchemaEdgeCasesTest do
     end
 
     test "handles multiple schema cross-references" do
-      defmodule AddressSchema do
-        use Elixact
-
-        schema do
-          field(:street, :string)
-          field(:city, :string)
-
-          field :residents, {:array, PersonSchema} do
-            optional()
-          end
-        end
-      end
-
-      defmodule CompanySchema do
-        use Elixact
-
-        schema do
-          field(:name, :string)
-          field(:address, AddressSchema)
-
-          field :employees, {:array, PersonSchema} do
-            optional()
-          end
-        end
-      end
-
-      defmodule PersonSchema do
-        use Elixact
-
-        schema do
-          field(:name, :string)
-
-          field :address, AddressSchema do
-            optional()
-          end
-
-          field :company, CompanySchema do
-            optional()
-          end
-        end
-      end
-
-      json_schema = JsonSchema.from_schema(PersonSchema)
+      json_schema = JsonSchema.from_schema(Elixact.JsonSchemaEdgeCasesTest.PersonSchema)
 
       # Should have AddressSchema and CompanySchema in definitions (PersonSchema is the root)
       assert Map.has_key?(json_schema["definitions"], "AddressSchema")

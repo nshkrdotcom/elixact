@@ -11,22 +11,15 @@ defmodule Elixact.JsonSchema.TypeMapper do
   @spec to_json_schema(Elixact.Types.type_definition() | module(), pid() | nil) :: map()
   def to_json_schema(type, store \\ nil)
 
-  def to_json_schema(type, store) do
+  def to_json_schema({:ref, _} = type, store), do: handle_schema_reference(type, store)
+
+  def to_json_schema(type, store) when is_atom(type) do
     cond do
-      match?({:ref, _}, type) ->
-        handle_schema_reference(type, store)
+      schema_module?(type) ->
+        handle_schema_reference({:ref, type}, store)
 
-      is_atom(type) and custom_type?(type) ->
+      custom_type?(type) ->
         apply_type_module(type)
-
-      match?({:__aliases__, _, _}, type) ->
-        module = Macro.expand(type, __ENV__)
-
-        if schema_module?(module) do
-          handle_schema_reference({:ref, module}, store)
-        else
-          apply_type_module(module)
-        end
 
       true ->
         normalized_type = normalize_type(type)
@@ -34,18 +27,37 @@ defmodule Elixact.JsonSchema.TypeMapper do
     end
   end
 
+  def to_json_schema({:__aliases__, _, _} = type, store) do
+    module = Macro.expand(type, __ENV__)
+
+    if schema_module?(module) do
+      handle_schema_reference({:ref, module}, store)
+    else
+      apply_type_module(module)
+    end
+  end
+
+  def to_json_schema(type, store) do
+    normalized_type = normalize_type(type)
+    convert_normalized_type(normalized_type, store)
+  end
+
   @spec schema_module?(module()) :: boolean()
-  defp schema_module?(module) do
+  defp schema_module?(module) when is_atom(module) do
     Code.ensure_loaded?(module) and function_exported?(module, :__schema__, 1)
   end
 
   @spec handle_schema_reference({:ref, atom()}, pid()) :: %{String.t() => String.t()}
   defp handle_schema_reference({:ref, module}, store) when is_atom(module) do
-    if store do
-      ReferenceStore.add_reference(store, module)
-      %{"$ref" => ReferenceStore.ref_path(module)}
+    if schema_module?(module) do
+      if store do
+        ReferenceStore.add_reference(store, module)
+        %{"$ref" => ReferenceStore.ref_path(module)}
+      else
+        raise "Schema reference #{inspect(module)} requires a reference store"
+      end
     else
-      raise "Schema reference #{inspect(module)} requires a reference store"
+      raise ArgumentError, "Module #{inspect(module)} is not a valid Elixact schema"
     end
   end
 
@@ -59,7 +71,7 @@ defmodule Elixact.JsonSchema.TypeMapper do
   end
 
   @spec custom_type?(module()) :: boolean()
-  defp custom_type?(module) do
+  defp custom_type?(module) when is_atom(module) do
     Code.ensure_loaded?(module) and function_exported?(module, :json_schema, 0)
   end
 
@@ -74,11 +86,17 @@ defmodule Elixact.JsonSchema.TypeMapper do
   end
 
   defp normalize_type({:array, type}) do
-    {:array, normalize_type(type), []}
+    normalized =
+      if is_atom(type) and schema_module?(type), do: {:ref, type}, else: normalize_type(type)
+
+    {:array, normalized, []}
   end
 
   defp normalize_type({:array, type, constraints}) do
-    {:array, normalize_type(type), constraints}
+    normalized =
+      if is_atom(type) and schema_module?(type), do: {:ref, type}, else: normalize_type(type)
+
+    {:array, normalized, constraints}
   end
 
   defp normalize_type({:map, {key_type, value_type}}) do
@@ -93,32 +111,40 @@ defmodule Elixact.JsonSchema.TypeMapper do
 
   # Convert normalized types
   @spec convert_normalized_type(Elixact.Types.type_definition(), pid() | nil) :: map()
-  defp convert_normalized_type(type, store) do
-    if match?({:ref, _}, type) and schema_module?(type |> elem(1)) do
-      handle_schema_reference(type, store)
+  defp convert_normalized_type({:ref, mod}, store) when is_atom(mod) do
+    if schema_module?(mod) do
+      handle_schema_reference({:ref, mod}, store)
     else
-      convert_type(type, store)
+      raise ArgumentError, "Invalid schema reference: #{inspect(mod)}"
     end
   end
 
-  @spec convert_type(Elixact.Types.type_definition(), pid() | nil) :: map()
-  defp convert_type({:type, base_type, constraints}, store) do
-    case base_type do
-      type when type in [:string, :integer, :float, :boolean] ->
-        map_basic_type(base_type)
-        |> apply_constraints(constraints)
+  defp convert_normalized_type({:type, base_type, constraints} = type, store)
+       when is_atom(base_type) and is_list(constraints) do
+    convert_type(type, store)
+  end
 
-      module when is_atom(module) ->
-        # Handle schema modules or custom type modules
-        if schema_module?(module) do
-          handle_schema_reference({:ref, module}, store)
-        else
-          if custom_type?(module) do
-            apply_type_module(module)
-          else
-            raise "Module #{inspect(module)} is not a valid Elixact type"
-          end
-        end
+  defp convert_normalized_type({:array, _, _} = type, store), do: convert_type(type, store)
+  defp convert_normalized_type({:map, {_, _}, _} = type, store), do: convert_type(type, store)
+  defp convert_normalized_type({:union, _, _} = type, store), do: convert_type(type, store)
+
+  defp convert_normalized_type(type, _store) do
+    raise ArgumentError, "Invalid type definition: #{inspect(type)}"
+  end
+
+  # Convert type definitions to JSON Schema
+  @spec convert_type(Elixact.Types.type_definition(), pid() | nil) :: map()
+  defp convert_type({:type, base_type, constraints}, _store)
+       when base_type in [:string, :integer, :float, :boolean] do
+    map_basic_type(base_type)
+    |> apply_constraints(constraints)
+  end
+
+  defp convert_type({:type, base_type, _constraints}, store) when is_atom(base_type) do
+    cond do
+      schema_module?(base_type) -> handle_schema_reference({:ref, base_type}, store)
+      custom_type?(base_type) -> apply_type_module(base_type)
+      true -> raise "Module #{inspect(base_type)} is not a valid Elixact type"
     end
   end
 
@@ -134,10 +160,9 @@ defmodule Elixact.JsonSchema.TypeMapper do
     map_union_type(types, constraints, store)
   end
 
-  # Catch-all for invalid type definitions
-  defp convert_type(invalid_type, _store) do
-    raise ArgumentError, "Invalid type definition: #{inspect(invalid_type)}"
-  end
+  # NOTE: All valid patterns for convert_type/2 are explicitly handled below.
+  # If you add a new type, add a new function head for it here.
+  # Unhandled patterns will raise a FunctionClauseError at runtime, making issues obvious during testing.
 
   # Basic type mapping
   @spec map_basic_type(:string | :integer | :float | :boolean) :: %{String.t() => String.t()}

@@ -338,9 +338,7 @@ defmodule Elixact.CustomTypeEdgeCasesTest do
       end
 
       # This might cause issues in validation - test that it's handled gracefully
-      assert_raise ArgumentError, fn ->
-        InvalidTypeDefCustomType.validate("test")
-      end
+      assert match?({:error, _}, InvalidTypeDefCustomType.validate("test"))
     end
 
     test "handles custom type metadata collection" do

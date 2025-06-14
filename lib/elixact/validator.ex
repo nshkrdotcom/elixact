@@ -121,35 +121,44 @@ defmodule Elixact.Validator do
   """
   @spec validate(Elixact.Types.type_definition() | module(), term(), validation_path()) ::
           validation_result()
-  def validate(type, value, path \\ [])
+  def validate(type, value, path), do: do_validate(type, value, path)
 
-  def validate({:ref, schema}, value, path) when is_atom(schema) do
+  @spec validate(Elixact.Types.type_definition() | module(), term()) :: validation_result()
+  def validate(type, value), do: do_validate(type, value, [])
+
+  defp do_validate({:ref, schema}, value, path) when is_atom(schema) do
     validate_schema(schema, value, path)
   end
 
-  def validate(schema, value, path) when is_atom(schema) do
+  defp do_validate(schema, value, path) when is_atom(schema) do
     cond do
-      # Reference a Schema module
       Code.ensure_loaded?(schema) and function_exported?(schema, :__schema__, 1) ->
         validate_schema(schema, value, path)
 
-      # Custom type
       Code.ensure_loaded?(schema) and function_exported?(schema, :type_definition, 0) ->
         schema.validate(value, path)
 
+      value == schema ->
+        {:ok, value}
+
       true ->
-        raise ArgumentError, "invalid schema: #{inspect(schema)}"
+        {:error,
+         Elixact.Error.new(
+           path,
+           :type,
+           "expected literal atom #{inspect(schema)}, got #{inspect(value)}"
+         )}
     end
   end
 
-  def validate({:type, name, constraints}, value, path) do
+  defp do_validate({:type, name, constraints}, value, path) do
     case Elixact.Types.validate(name, value) do
       {:ok, validated} -> apply_constraints(validated, constraints, path)
       {:error, error} -> {:error, %{error | path: path ++ error.path}}
     end
   end
 
-  def validate({:array, inner_type, constraints}, value, path) do
+  defp do_validate({:array, inner_type, constraints}, value, path) do
     if is_list(value) do
       validate_array_items(value, inner_type, constraints, path)
     else
@@ -157,12 +166,75 @@ defmodule Elixact.Validator do
     end
   end
 
-  def validate({:map, {key_type, value_type}, constraints}, value, path) do
+  defp do_validate({:map, {key_type, value_type}, constraints}, value, path) do
     validate_map(value, key_type, value_type, constraints, path)
   end
 
-  def validate({:union, types, _constraints}, value, path) do
-    validate_union(value, types, path)
+  defp do_validate({:tuple, types}, value, path) do
+    if is_tuple(value) and tuple_size(value) == length(types) do
+      values = Tuple.to_list(value)
+
+      results =
+        Enum.zip(types, values)
+        |> Enum.with_index()
+        |> Enum.map(fn {{type, val}, idx} ->
+          normalized_type = Elixact.Types.normalize_type(type)
+
+          case normalized_type do
+            {:type, t, _} -> do_validate({:type, t, []}, val, path ++ [idx])
+            {:union, _, _} -> do_validate(normalized_type, val, path ++ [idx])
+            _ -> do_validate(normalized_type, val, path ++ [idx])
+          end
+        end)
+
+      case Enum.find(results, &match?({:error, _}, &1)) do
+        nil ->
+          {:ok, value}
+
+        {:error, err} ->
+          {:error, Elixact.Error.new(path, :type, "tuple element invalid: #{inspect(err)}")}
+      end
+    else
+      {:error, Elixact.Error.new(path, :type, "expected tuple, got #{inspect(value)}")}
+    end
+  end
+
+  defp do_validate({:union, types, _constraints}, value, path) do
+    normalized_types = Enum.map(types, &Elixact.Types.normalize_type/1)
+
+    results =
+      Enum.map(normalized_types, fn type ->
+        branch_result = do_validate(type, value, path)
+        branch_result
+      end)
+
+    case Enum.find(results, &match?({:ok, _}, &1)) do
+      {:ok, validated} ->
+        {:ok, validated}
+
+      nil ->
+        detailed_errors =
+          results
+          |> Enum.flat_map(fn
+            {:error, errors} when is_list(errors) -> errors
+            {:error, error} -> [error]
+            _ -> []
+          end)
+
+        case detailed_errors do
+          [] ->
+            {:error, [Elixact.Error.new(path, :type, "value did not match any type in union")]}
+
+          errors ->
+            best_error = Enum.max_by(errors, fn error -> length(error.path) end)
+
+            if length(best_error.path) > length(path) do
+              {:error, [best_error]}
+            else
+              {:error, [Elixact.Error.new(path, :type, "value did not match any type in union")]}
+            end
+        end
+    end
   end
 
   @spec apply_constraints(term(), [term()], validation_path()) :: validation_result()
@@ -319,42 +391,5 @@ defmodule Elixact.Validator do
 
   defp validate_map(value, _key_type, _value_type, _constraints, path) do
     {:error, [Error.new(path, :type, "expected map, got #{inspect(value)}")]}
-  end
-
-  @spec validate_union(term(), [Elixact.Types.type_definition()], validation_path()) ::
-          validation_result()
-  defp validate_union(value, types, path) do
-    results =
-      Enum.map(types, &validate(&1, value, path))
-
-    case Enum.find(results, &match?({:ok, _}, &1)) do
-      {:ok, validated} ->
-        {:ok, validated}
-
-      nil ->
-        # If no type matches, return the most detailed error (the one with the longest path)
-        detailed_errors =
-          results
-          |> Enum.flat_map(fn
-            {:error, errors} when is_list(errors) -> errors
-            {:error, error} -> [error]
-            _ -> []
-          end)
-
-        case detailed_errors do
-          [] ->
-            {:error, [Error.new(path, :type, "value did not match any type in union")]}
-
-          errors ->
-            # Return the error with the most detailed path (longest path indicates deeper validation)
-            best_error = Enum.max_by(errors, fn error -> length(error.path) end)
-
-            if length(best_error.path) > length(path) do
-              {:error, [best_error]}
-            else
-              {:error, [Error.new(path, :type, "value did not match any type in union")]}
-            end
-        end
-    end
   end
 end

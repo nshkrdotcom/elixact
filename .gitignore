@@ -29,3 +29,5 @@ elixact-*.tar
 #drops/
 .aider*
 .env
+
+repomix-output.xml

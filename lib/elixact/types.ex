@@ -97,6 +97,9 @@ defmodule Elixact.Types do
   @spec ref(atom()) :: {:ref, atom()}
   def ref(schema), do: {:ref, schema}
 
+  @spec tuple([type_definition()]) :: {:tuple, [type_definition()]}
+  def tuple(types) when is_list(types), do: {:tuple, types}
+
   # Helper to normalize type definitions
   @doc """
   Normalizes a type definition to the standard internal format.
@@ -124,22 +127,40 @@ defmodule Elixact.Types do
     {:union, Enum.map(types, &normalize_type/1), []}
   end
 
+  def normalize_type({:tuple, types}) when is_list(types) do
+    {:tuple,
+     Enum.map(types, fn type ->
+       cond do
+         is_atom(type) and type in [:string, :integer, :float, :boolean, :any, :atom] ->
+           {:type, type, []}
+
+         is_atom(type) and not is_schema_module(type) ->
+           type
+
+         true ->
+           normalize_type(type)
+       end
+     end)}
+  end
+
   def normalize_type(type) when is_atom(type) do
-    case type do
-      type when type in [:string, :integer, :float, :boolean, :any] ->
+    cond do
+      type in [:string, :integer, :float, :boolean, :any, :atom] ->
         {:type, type, []}
 
-      other ->
-        if Code.ensure_loaded?(other) && function_exported?(other, :type_definition, 0) do
-          other.type_definition()
-        else
-          # Assume schema module reference
-          {:ref, other}
-        end
+      Code.ensure_loaded?(type) and function_exported?(type, :__schema__, 1) ->
+        {:ref, type}
+
+      true ->
+        type
     end
   end
 
   def normalize_type(other), do: other
+
+  defp is_schema_module(atom) when is_atom(atom) do
+    Code.ensure_loaded?(atom) and function_exported?(atom, :type_definition, 0)
+  end
 
   @doc """
   Coerces a value to the specified type.
@@ -247,9 +268,15 @@ defmodule Elixact.Types do
   def validate(:boolean, value),
     do: {:error, Error.new([], :type, "expected boolean, got #{inspect(value)}")}
 
+  def validate(:atom, value) when is_atom(value) and not is_nil(value), do: {:ok, value}
+
+  def validate(:atom, value),
+    do: {:error, Error.new([], :type, "expected atom, got #{inspect(value)}")}
+
   def validate(:any, value), do: {:ok, value}
 
-  def validate(type, value) do
-    {:error, Error.new([], :type, "#{inspect(value)} is not a valid #{inspect(type)}")}
-  end
+  def validate(type, value) when is_atom(type),
+    do: {:error, Error.new([], :type, "#{inspect(value)} is not a valid #{inspect(type)}")}
+
+  def validate(type, value), do: Elixact.Validator.validate(type, value, [])
 end

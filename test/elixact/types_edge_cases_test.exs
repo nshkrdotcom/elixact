@@ -49,9 +49,9 @@ defmodule Elixact.TypesEdgeCasesTest do
     end
 
     test "handles normalize_type with unknown atom" do
-      # This should create a reference type
+      # This should leave unknown atoms as literals
       unknown_type = Types.normalize_type(:UnknownType)
-      assert unknown_type == {:ref, :UnknownType}
+      assert unknown_type == :UnknownType
     end
 
     test "handles normalize_type with already normalized types" do
