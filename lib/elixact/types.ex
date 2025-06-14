@@ -45,6 +45,7 @@ defmodule Elixact.Types do
           {:type, atom(), [any()]}
           | {:array, type_definition, [any()]}
           | {:map, {type_definition, type_definition}, [any()]}
+          | {:object, %{atom() => type_definition()}, [any()]}
           | {:union, [type_definition], [any()]}
           | {:ref, atom()}
 
@@ -93,6 +94,16 @@ defmodule Elixact.Types do
   @spec union([type_definition()]) :: {:union, [type_definition()], []}
   def union(types) when is_list(types), do: {:union, types, []}
 
+  @spec object(%{atom() => type_definition()}) :: {:object, %{atom() => type_definition()}, []}
+  def object(fields) when is_map(fields) do
+    normalized_fields =
+      fields
+      |> Enum.map(fn {key, type} -> {key, normalize_type(type)} end)
+      |> Enum.into(%{})
+
+    {:object, normalized_fields, []}
+  end
+
   # Type reference
   @spec ref(atom()) :: {:ref, atom()}
   def ref(schema), do: {:ref, schema}
@@ -121,6 +132,32 @@ defmodule Elixact.Types do
   @spec normalize_type(term()) :: type_definition()
   def normalize_type({:map, {key_type, value_type}}) do
     {:map, {normalize_type(key_type), normalize_type(value_type)}, []}
+  end
+
+  def normalize_type({:object, fields, constraints}) when is_map(fields) do
+    normalized_fields =
+      fields
+      |> Enum.map(fn {key, type} -> {key, normalize_type(type)} end)
+      |> Enum.into(%{})
+
+    {:object, normalized_fields, constraints}
+  end
+
+  def normalize_type({:object, fields}) when is_map(fields) do
+    normalized_fields =
+      fields
+      |> Enum.map(fn {key, type} -> {key, normalize_type(type)} end)
+      |> Enum.into(%{})
+
+    {:object, normalized_fields, []}
+  end
+
+  def normalize_type({:array, inner_type, constraints}) do
+    {:array, normalize_type(inner_type), constraints}
+  end
+
+  def normalize_type({:array, inner_type}) do
+    {:array, normalize_type(inner_type), []}
   end
 
   def normalize_type({:union, types}) when is_list(types) do

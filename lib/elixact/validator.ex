@@ -170,6 +170,10 @@ defmodule Elixact.Validator do
     validate_map(value, key_type, value_type, constraints, path)
   end
 
+  defp do_validate({:object, fields, constraints}, value, path) do
+    validate_object(value, fields, constraints, path)
+  end
+
   defp do_validate({:tuple, types}, value, path) do
     if is_tuple(value) and tuple_size(value) == length(types) do
       values = Tuple.to_list(value)
@@ -391,5 +395,44 @@ defmodule Elixact.Validator do
 
   defp validate_map(value, _key_type, _value_type, _constraints, path) do
     {:error, [Error.new(path, :type, "expected map, got #{inspect(value)}")]}
+  end
+
+  @spec validate_object(
+          term(),
+          %{atom() => Elixact.Types.type_definition()},
+          [term()],
+          validation_path()
+        ) :: validation_result()
+  defp validate_object(value, fields, constraints, path) when is_map(value) do
+    # Validate each field in the object schema
+    results =
+      Enum.map(fields, fn {field_key, field_type} ->
+        field_path = path ++ [field_key]
+        field_value = Map.get(value, field_key)
+
+        case validate(field_type, field_value, field_path) do
+          {:ok, validated} -> {:ok, {field_key, validated}}
+          {:error, errors} -> {:error, errors}
+        end
+      end)
+
+    # Check for validation errors
+    case Enum.split_with(results, &match?({:ok, _}, &1)) do
+      {oks, []} ->
+        validated_object = Map.new(Enum.map(oks, fn {:ok, kv} -> kv end))
+
+        # Apply constraints to the validated object
+        case apply_constraints(validated_object, constraints, path) do
+          {:ok, final} -> {:ok, final}
+          {:error, error} -> {:error, [error]}
+        end
+
+      {_, errors} ->
+        {:error, Enum.flat_map(errors, fn {:error, errs} -> List.wrap(errs) end)}
+    end
+  end
+
+  defp validate_object(value, _fields, _constraints, path) do
+    {:error, [Error.new(path, :type, "expected object (map), got #{inspect(value)}")]}
   end
 end
