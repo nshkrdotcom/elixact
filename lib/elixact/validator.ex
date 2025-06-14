@@ -243,6 +243,9 @@ defmodule Elixact.Validator do
 
   @spec apply_constraints(term(), [term()], validation_path()) :: validation_result()
   defp apply_constraints(value, constraints, path) do
+    # Extract custom error messages from constraints
+    error_messages = extract_error_messages(constraints)
+
     Enum.reduce_while(constraints, {:ok, value}, fn
       {constraint, constraint_value}, {:ok, val} ->
         case apply_constraint(constraint, val, constraint_value) do
@@ -250,9 +253,21 @@ defmodule Elixact.Validator do
             {:cont, {:ok, val}}
 
           false ->
-            {:halt, {:error, Error.new(path, constraint, "failed #{constraint} constraint")}}
+            message = Map.get(error_messages, constraint, "failed #{constraint} constraint")
+            {:halt, {:error, Error.new(path, constraint, message)}}
         end
+
+      # Skip error message constraints - they're already processed
+      {:error_message, _, _}, {:ok, val} ->
+        {:cont, {:ok, val}}
     end)
+  end
+
+  @spec extract_error_messages([term()]) :: %{atom() => String.t()}
+  defp extract_error_messages(constraints) do
+    constraints
+    |> Enum.filter(&match?({:error_message, _, _}, &1))
+    |> Enum.into(%{}, fn {:error_message, constraint, message} -> {constraint, message} end)
   end
 
   # String constraints

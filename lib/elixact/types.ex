@@ -49,6 +49,8 @@ defmodule Elixact.Types do
           | {:union, [type_definition], [any()]}
           | {:ref, atom()}
 
+  @type constraint_with_message :: {atom(), any()} | {atom(), any(), String.t()}
+
   alias Elixact.Error
 
   # Basic types
@@ -262,6 +264,69 @@ defmodule Elixact.Types do
     case type do
       {:type, name, existing} -> {:type, name, existing ++ constraints}
       {kind, inner, existing} -> {kind, inner, existing ++ constraints}
+    end
+  end
+
+  @doc """
+  Adds a custom error message for a specific constraint to a type definition.
+
+  ## Parameters
+    * `type` - The type definition to add the custom error message to
+    * `constraint` - The constraint name (atom) to customize the error for
+    * `message` - The custom error message to use when this constraint fails
+
+  ## Returns
+    * Updated type definition with custom error message
+
+  ## Examples
+
+      iex> string_type = Elixact.Types.string()
+      iex> |> Elixact.Types.with_constraints([min_length: 3])
+      iex> |> Elixact.Types.with_error_message(:min_length, "Name must be at least 3 characters long")
+      {:type, :string, [min_length: 3, {:error_message, :min_length, "Name must be at least 3 characters long"}]}
+  """
+  @spec with_error_message(type_definition(), atom(), String.t()) :: {atom(), term(), [term()]}
+  def with_error_message(type, constraint, message)
+      when is_atom(constraint) and is_binary(message) do
+    error_constraint = {:error_message, constraint, message}
+
+    case type do
+      {:type, name, existing} -> {:type, name, existing ++ [error_constraint]}
+      {kind, inner, existing} -> {kind, inner, existing ++ [error_constraint]}
+    end
+  end
+
+  @doc """
+  Adds multiple custom error messages for constraints to a type definition.
+
+  ## Parameters
+    * `type` - The type definition to add the custom error messages to
+    * `error_messages` - A keyword list or map of constraint => message pairs
+
+  ## Returns
+    * Updated type definition with custom error messages
+
+  ## Examples
+
+      iex> string_type = Elixact.Types.string()
+      iex> |> Elixact.Types.with_constraints([min_length: 3, max_length: 50])
+      iex> |> Elixact.Types.with_error_messages([
+      iex>      min_length: "Name must be at least 3 characters long",
+      iex>      max_length: "Name cannot exceed 50 characters"
+      iex>    ])
+      {:type, :string, [min_length: 3, max_length: 50, {:error_message, :min_length, "Name must be at least 3 characters long"}, {:error_message, :max_length, "Name cannot exceed 50 characters"}]}
+  """
+  @spec with_error_messages(type_definition(), [{atom(), String.t()}] | %{atom() => String.t()}) ::
+          {atom(), term(), [term()]}
+  def with_error_messages(type, error_messages)
+      when is_list(error_messages) or is_map(error_messages) do
+    error_constraints =
+      error_messages
+      |> Enum.map(fn {constraint, message} -> {:error_message, constraint, message} end)
+
+    case type do
+      {:type, name, existing} -> {:type, name, existing ++ error_constraints}
+      {kind, inner, existing} -> {kind, inner, existing ++ error_constraints}
     end
   end
 
