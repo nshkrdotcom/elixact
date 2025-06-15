@@ -13,6 +13,8 @@ defmodule TestHelpers do
   @moduledoc """
   Helper functions for Elixact tests.
   """
+  
+  import ExUnit.Assertions
 
   @doc """
   Creates a temporary test schema for testing purposes.
@@ -115,7 +117,7 @@ defmodule TestHelpers do
       Task.async(fn -> fun.(i) end)
     end
     
-    Task.await_all(tasks, 30_000)
+    Task.await_many(tasks, 30_000)
   end
 
   @doc """
@@ -281,7 +283,7 @@ defmodule TestHelpers do
 
   defp generate_random_value({:map, {key_type, value_type}}) do
     size = :rand.uniform(3)
-    for i <- 1..size do
+    for _i <- 1..size do
       {generate_random_value(key_type), generate_random_value(value_type)}
     end |> Map.new()
   end
@@ -355,6 +357,8 @@ defmodule MemoryTestHelpers do
   @moduledoc """
   Helpers for testing memory usage and garbage collection.
   """
+  
+  import ExUnit.Assertions
 
   @doc """
   Measures memory usage before and after running a function.

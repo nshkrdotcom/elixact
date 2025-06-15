@@ -13,7 +13,7 @@ defmodule Elixact.Wrapper do
   - Perform temporary schema-based validation without defining a full schema
   """
 
-  alias Elixact.{Runtime, TypeAdapter, FieldMeta}
+  alias Elixact.{Runtime, TypeAdapter}
   alias Elixact.Runtime.DynamicSchema
 
   @type wrapper_schema :: DynamicSchema.t()

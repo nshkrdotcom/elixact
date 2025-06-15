@@ -7,7 +7,7 @@ defmodule Elixact.Runtime do
   """
 
   alias Elixact.Runtime.DynamicSchema
-  alias Elixact.{FieldMeta, Validator, JsonSchema}
+  alias Elixact.{FieldMeta, Validator}
 
   @type field_definition :: {atom(), type_spec()} | {atom(), type_spec(), keyword()}
   @type type_spec :: Elixact.Types.type_definition() | atom() | module()
@@ -110,7 +110,7 @@ defmodule Elixact.Runtime do
       %{"type" => "object", "properties" => %{...}}
   """
   @spec to_json_schema(DynamicSchema.t(), keyword()) :: map()
-  def to_json_schema(%DynamicSchema{} = schema, opts \\ []) do
+  def to_json_schema(%DynamicSchema{} = schema, _opts \\ []) do
     {:ok, store} = Elixact.JsonSchema.ReferenceStore.start_link()
 
     try do

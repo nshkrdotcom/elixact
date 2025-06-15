@@ -1,6 +1,6 @@
-defmodule Elixact.IntegrationTest do
+defmodule Elixact.ExtendedIntegrationTest do
   use ExUnit.Case, async: true
-  
+
   alias Elixact.{Runtime, TypeAdapter, Wrapper, Config, EnhancedValidator}
   alias Elixact.JsonSchema.Resolver
 
@@ -12,21 +12,21 @@ defmodule Elixact.IntegrationTest do
         {:scores, {:array, :integer}, [min_items: 1, max_items: 10]},
         {:status, {:union, [:string, :integer]}, [required: true]}
       ]
-      
+
       schema = Runtime.create_schema(fields, title: "Complex Data Schema")
-      
+
       # Validate using runtime schema
       data = %{
         user_data: %{"name" => "John", "age" => 30},
         scores: [85, 92, 78],
         status: "active"
       }
-      
+
       assert {:ok, validated} = Runtime.validate(data, schema)
       assert validated.user_data["name"] == "John"
       assert length(validated.scores) == 3
       assert validated.status == "active"
-      
+
       # Also validate individual fields using TypeAdapter
       assert {:ok, _} = TypeAdapter.validate({:map, {:string, :any}}, data.user_data)
       assert {:ok, _} = TypeAdapter.validate({:array, :integer}, data.scores)
@@ -38,16 +38,16 @@ defmodule Elixact.IntegrationTest do
         {:count, :integer, [required: true]},
         {:percentage, :float, [required: true]}
       ]
-      
+
       schema = Runtime.create_schema(fields)
-      
+
       # Data that needs coercion
       string_data = %{count: "42", percentage: "85.5"}
-      
+
       # Runtime validation with coercion via EnhancedValidator
       config = Config.create(coercion: :safe)
       assert {:ok, validated} = EnhancedValidator.validate(schema, string_data, config: config)
-      
+
       assert validated.count == 42
       assert validated.percentage == 85.5
     end
@@ -62,12 +62,12 @@ defmodule Elixact.IntegrationTest do
         {:confidence, :float, [gt: 0.0, lteq: 1.0, description: "Confidence score"]},
         {:sources, {:array, :string}, [description: "Information sources"]}
       ]
-      
-      schema = Runtime.create_schema(fields, 
+
+      schema = Runtime.create_schema(fields,
         title: "DSPyProgramOutputs",
         description: "Output schema for DSPy program"
       )
-      
+
       # Test with valid data
       output_data = %{
         thought: "To answer this question, I need to consider...",
@@ -75,7 +75,7 @@ defmodule Elixact.IntegrationTest do
         confidence: 0.95,
         sources: ["source1.txt", "source2.txt"]
       }
-      
+
       assert {:ok, validated} = Runtime.validate(output_data, schema)
       assert validated.thought == "To answer this question, I need to consider..."
       assert validated.confidence == 0.95
@@ -91,7 +91,7 @@ defmodule Elixact.IntegrationTest do
         {{:union, [:string, :integer]}, "string_value"},
         {{:union, [:string, :integer]}, 42}
       ]
-      
+
       for {type_spec, value} <- test_cases do
         assert {:ok, validated} = TypeAdapter.validate(type_spec, value)
         assert validated == value
@@ -106,12 +106,12 @@ defmodule Elixact.IntegrationTest do
         {:items, {:array, :string}, ["a", "b", "c"], [min_items: 1]},
         {:score, :float, 85.5, [gteq: 0.0, lteq: 100.0]}
       ]
-      
+
       for {field_name, type_spec, value, constraints} <- wrapper_cases do
         assert {:ok, validated} = Wrapper.wrap_and_validate(
-          field_name, 
-          type_spec, 
-          value, 
+          field_name,
+          type_spec,
+          value,
           constraints: constraints
         )
         assert validated == value
@@ -121,7 +121,7 @@ defmodule Elixact.IntegrationTest do
     test "simulates DSPy config modification pattern" do
       # Simulate: ConfigDict(extra="forbid", frozen=True)
       base_config = Config.create()
-      
+
       # Apply DSPy-style configuration
       dspy_config = Config.merge(base_config, %{
         extra: :forbid,
@@ -129,11 +129,11 @@ defmodule Elixact.IntegrationTest do
         strict: true,
         validate_assignment: true
       })
-      
+
       assert dspy_config.extra == :forbid
       assert dspy_config.frozen == true
       assert dspy_config.strict == true
-      
+
       # Test that frozen config prevents modification
       assert_raise RuntimeError, fn ->
         Config.merge(dspy_config, %{strict: false})
@@ -150,26 +150,26 @@ defmodule Elixact.IntegrationTest do
         {:tags, {:array, :string}, [min_items: 0, max_items: 20]},
         {:metadata, {:map, {:string, :any}}, [description: "Additional metadata"]}
       ]
-      
+
       schema = Runtime.create_schema(fields,
         title: "Complex User Schema",
         description: "A comprehensive user data schema"
       )
-      
+
       json_schema = Runtime.to_json_schema(schema)
-      
+
       # Verify structure
       assert json_schema["type"] == "object"
       assert json_schema["title"] == "Complex User Schema"
       assert json_schema["description"] == "A comprehensive user data schema"
-      
+
       # Verify properties
       properties = json_schema["properties"]
       assert properties["user"]["type"] == "object"
       assert properties["tags"]["type"] == "array"
       assert properties["tags"]["maxItems"] == 20
       assert properties["preferences"]["type"] == "object"
-      
+
       # Verify required fields
       assert "user" in json_schema["required"]
       refute "preferences" in json_schema["required"]
@@ -180,19 +180,19 @@ defmodule Elixact.IntegrationTest do
       fields = [
         {:data, {:array, {:map, {:string, {:union, [:string, :integer]}}}}, []}
       ]
-      
+
       schema = Runtime.create_schema(fields)
       json_schema = Runtime.to_json_schema(schema)
-      
+
       # Resolve all references
       resolved = Resolver.resolve_references(json_schema)
-      
+
       # Flatten for LLM compatibility
       flattened = Resolver.flatten_schema(resolved)
-      
+
       # Should be fully expanded without references
       refute has_references?(flattened)
-      
+
       # Verify structure is preserved
       data_prop = flattened["properties"]["data"]
       assert data_prop["type"] == "array"
