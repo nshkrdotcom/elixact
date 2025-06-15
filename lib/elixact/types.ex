@@ -184,7 +184,7 @@ defmodule Elixact.Types do
 
   def normalize_type(type) when is_atom(type) do
     cond do
-      type in [:string, :integer, :float, :boolean, :any, :atom] ->
+      type in [:string, :integer, :float, :boolean, :any, :atom, :map] ->
         {:type, type, []}
 
       Code.ensure_loaded?(type) and function_exported?(type, :__schema__, 1) ->
@@ -406,6 +406,11 @@ defmodule Elixact.Types do
     do: {:error, Error.new([], :type, "expected atom, got #{inspect(value)}")}
 
   def validate(:any, value), do: {:ok, value}
+
+  def validate(:map, value) when is_map(value), do: {:ok, value}
+
+  def validate(:map, value),
+    do: {:error, Error.new([], :type, "expected map, got #{inspect(value)}")}
 
   def validate(type, value) when is_atom(type),
     do: {:error, Error.new([], :type, "#{inspect(value)} is not a valid #{inspect(type)}")}

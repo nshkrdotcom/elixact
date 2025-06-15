@@ -138,7 +138,7 @@ defmodule Elixact.Validator do
   defp do_validate(schema, value, path) when is_atom(schema) do
     cond do
       # Check if it's a basic type first (like :atom, :string, :integer, etc.)
-      schema in [:string, :integer, :float, :boolean, :any, :atom] ->
+      schema in [:string, :integer, :float, :boolean, :any, :atom, :map] ->
         case Elixact.Types.validate(schema, value) do
           {:ok, validated} -> {:ok, validated}
           {:error, error} -> {:error, %{error | path: path ++ error.path}}

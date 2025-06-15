@@ -80,7 +80,7 @@ defmodule Elixact.JsonSchema.TypeMapper do
   defp normalize_type(type) when is_atom(type) do
     cond do
       # Check for basic types first
-      type in [:string, :integer, :float, :boolean, :any, :atom] ->
+      type in [:string, :integer, :float, :boolean, :any, :atom, :map] ->
         {:type, type, []}
 
       schema_module?(type) ->
@@ -141,7 +141,7 @@ defmodule Elixact.JsonSchema.TypeMapper do
   # Convert type definitions to JSON Schema
   @spec convert_type(Elixact.Types.type_definition(), pid() | nil) :: map()
   defp convert_type({:type, base_type, constraints}, _store)
-       when base_type in [:string, :integer, :float, :boolean, :atom, :any] do
+       when base_type in [:string, :integer, :float, :boolean, :atom, :any, :map] do
     map_basic_type(base_type)
     |> apply_constraints(constraints)
   end
@@ -171,7 +171,7 @@ defmodule Elixact.JsonSchema.TypeMapper do
   # Unhandled patterns will raise a FunctionClauseError at runtime, making issues obvious during testing.
 
   # Basic type mapping
-  @spec map_basic_type(:string | :integer | :float | :boolean | :atom | :any) :: %{
+  @spec map_basic_type(:string | :integer | :float | :boolean | :atom | :any | :map) :: %{
           optional(String.t()) => String.t()
         }
   defp map_basic_type(:string), do: %{"type" => "string"}
@@ -183,6 +183,7 @@ defmodule Elixact.JsonSchema.TypeMapper do
     do: %{"type" => "string", "description" => "Atom value (represented as string in JSON)"}
 
   defp map_basic_type(:any), do: %{}
+  defp map_basic_type(:map), do: %{"type" => "object"}
 
   # Array type mapping
   @spec map_array_type(Elixact.Types.type_definition(), [term()], pid() | nil) :: map()
