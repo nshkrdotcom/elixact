@@ -82,10 +82,10 @@ defmodule Elixact.TypeAdapter do
       end
     rescue
       FunctionClauseError ->
-        raise ArgumentError, "Invalid type specification: #{inspect(type_spec)}"
+        reraise ArgumentError, "Invalid type specification: #{inspect(type_spec)}", __STACKTRACE__
 
       MatchError ->
-        raise ArgumentError, "Invalid type specification: #{inspect(type_spec)}"
+        reraise ArgumentError, "Invalid type specification: #{inspect(type_spec)}", __STACKTRACE__
     end
   end
 

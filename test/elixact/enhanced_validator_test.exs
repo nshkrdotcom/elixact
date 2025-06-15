@@ -1,8 +1,7 @@
 defmodule Elixact.EnhancedValidatorTest do
   use ExUnit.Case, async: true
 
-  alias Elixact.{EnhancedValidator, Runtime, TypeAdapter, Config, Wrapper}
-  alias Elixact.Runtime.DynamicSchema
+  alias Elixact.{Config, EnhancedValidator, Runtime}
   alias Elixact.Error
 
   describe "validate/3 with different targets" do

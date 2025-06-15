@@ -62,7 +62,11 @@ defmodule Elixact.Wrapper do
     end
 
     # Note: Type specification validation is handled during schema creation and validation
+    do_create_wrapper(field_name, type_spec, opts)
+  end
 
+  @spec do_create_wrapper(atom(), TypeAdapter.type_spec(), wrapper_options()) :: wrapper_schema()
+  defp do_create_wrapper(field_name, type_spec, opts) do
     # Extract wrapper options
     required = Keyword.get(opts, :required, true)
     description = Keyword.get(opts, :description)
@@ -217,12 +221,14 @@ defmodule Elixact.Wrapper do
         ) ::
           %{atom() => wrapper_schema()}
   def create_multiple_wrappers(field_specs, global_opts \\ []) do
-    field_specs
-    |> Enum.map(fn {field_name, type_spec, opts} ->
+    mapper_fn = fn {field_name, type_spec, opts} ->
       merged_opts = Keyword.merge(global_opts, opts)
       wrapper = create_wrapper(field_name, type_spec, merged_opts)
       {field_name, wrapper}
-    end)
+    end
+
+    field_specs
+    |> Enum.map(mapper_fn)
     |> Map.new()
   end
 
@@ -308,9 +314,11 @@ defmodule Elixact.Wrapper do
   @spec create_wrapper_factory(TypeAdapter.type_spec(), wrapper_options()) ::
           (atom() -> wrapper_schema())
   def create_wrapper_factory(type_spec, base_opts \\ []) do
-    fn field_name ->
+    wrapper_fn = fn field_name ->
       create_wrapper(field_name, type_spec, base_opts)
     end
+
+    wrapper_fn
   end
 
   @doc """

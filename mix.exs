@@ -62,7 +62,8 @@ defmodule Elixact.MixProject do
         :underspecs,
         :unknown,
         :unmatched_returns
-      ]
+      ],
+      ignore_warnings: ".dialyzer_ignore.exs"
     ]
   end
 end
