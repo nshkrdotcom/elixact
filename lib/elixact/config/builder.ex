@@ -7,9 +7,7 @@ defmodule Elixact.Config.Builder do
   """
 
   @enforce_keys []
-  defstruct [
-    opts: %{}
-  ]
+  defstruct opts: %{}
 
   @type t :: %__MODULE__{
           opts: map()
@@ -26,7 +24,7 @@ defmodule Elixact.Config.Builder do
       iex> builder = Elixact.Config.Builder.new()
       %Elixact.Config.Builder{opts: %{}}
   """
-  @spec new() :: t()
+  @spec new() :: %__MODULE__{opts: %{}}
   def new do
     %__MODULE__{opts: %{}}
   end
@@ -88,7 +86,6 @@ defmodule Elixact.Config.Builder do
       iex> builder |> Elixact.Config.Builder.forbid_extra()
       %Elixact.Config.Builder{opts: %{extra: :forbid}}
   """
-  @spec forbid_extra(t()) :: t()
   def forbid_extra(%__MODULE__{} = builder) do
     extra(builder, :forbid)
   end
@@ -107,7 +104,6 @@ defmodule Elixact.Config.Builder do
       iex> builder |> Elixact.Config.Builder.allow_extra()
       %Elixact.Config.Builder{opts: %{extra: :allow}}
   """
-  @spec allow_extra(t()) :: t()
   def allow_extra(%__MODULE__{} = builder) do
     extra(builder, :allow)
   end
@@ -146,7 +142,6 @@ defmodule Elixact.Config.Builder do
       iex> builder |> Elixact.Config.Builder.no_coercion()
       %Elixact.Config.Builder{opts: %{coercion: :none}}
   """
-  @spec no_coercion(t()) :: t()
   def no_coercion(%__MODULE__{} = builder) do
     coercion(builder, :none)
   end
@@ -165,7 +160,6 @@ defmodule Elixact.Config.Builder do
       iex> builder |> Elixact.Config.Builder.safe_coercion()
       %Elixact.Config.Builder{opts: %{coercion: :safe}}
   """
-  @spec safe_coercion(t()) :: t()
   def safe_coercion(%__MODULE__{} = builder) do
     coercion(builder, :safe)
   end
@@ -184,7 +178,6 @@ defmodule Elixact.Config.Builder do
       iex> builder |> Elixact.Config.Builder.aggressive_coercion()
       %Elixact.Config.Builder{opts: %{coercion: :aggressive}}
   """
-  @spec aggressive_coercion(t()) :: t()
   def aggressive_coercion(%__MODULE__{} = builder) do
     coercion(builder, :aggressive)
   end
@@ -245,7 +238,8 @@ defmodule Elixact.Config.Builder do
       %Elixact.Config.Builder{opts: %{error_format: :simple}}
   """
   @spec error_format(t(), Elixact.Config.error_format()) :: t()
-  def error_format(%__MODULE__{} = builder, format) when format in [:detailed, :simple, :minimal] do
+  def error_format(%__MODULE__{} = builder, format)
+      when format in [:detailed, :simple, :minimal] do
     %{builder | opts: Map.put(builder.opts, :error_format, format)}
   end
 
@@ -263,7 +257,6 @@ defmodule Elixact.Config.Builder do
       iex> builder |> Elixact.Config.Builder.detailed_errors()
       %Elixact.Config.Builder{opts: %{error_format: :detailed}}
   """
-  @spec detailed_errors(t()) :: t()
   def detailed_errors(%__MODULE__{} = builder) do
     error_format(builder, :detailed)
   end
@@ -282,7 +275,6 @@ defmodule Elixact.Config.Builder do
       iex> builder |> Elixact.Config.Builder.simple_errors()
       %Elixact.Config.Builder{opts: %{error_format: :simple}}
   """
-  @spec simple_errors(t()) :: t()
   def simple_errors(%__MODULE__{} = builder) do
     error_format(builder, :simple)
   end
@@ -324,7 +316,6 @@ defmodule Elixact.Config.Builder do
       iex> builder |> Elixact.Config.Builder.case_insensitive()
       %Elixact.Config.Builder{opts: %{case_sensitive: false}}
   """
-  @spec case_insensitive(t()) :: t()
   def case_insensitive(%__MODULE__{} = builder) do
     case_sensitive(builder, false)
   end
@@ -345,7 +336,8 @@ defmodule Elixact.Config.Builder do
       %Elixact.Config.Builder{opts: %{max_anyof_union_len: 3}}
   """
   @spec max_union_length(t(), non_neg_integer()) :: t()
-  def max_union_length(%__MODULE__{} = builder, max_length) when is_integer(max_length) and max_length > 0 do
+  def max_union_length(%__MODULE__{} = builder, max_length)
+      when is_integer(max_length) and max_length > 0 do
     %{builder | opts: Map.put(builder.opts, :max_anyof_union_len, max_length)}
   end
 
@@ -387,7 +379,8 @@ defmodule Elixact.Config.Builder do
       %Elixact.Config.Builder{opts: %{description_generator: #Function<...>}}
   """
   @spec description_generator(t(), (atom() -> String.t())) :: t()
-  def description_generator(%__MODULE__{} = builder, generator_fn) when is_function(generator_fn, 1) do
+  def description_generator(%__MODULE__{} = builder, generator_fn)
+      when is_function(generator_fn, 1) do
     %{builder | opts: Map.put(builder.opts, :description_generator, generator_fn)}
   end
 
@@ -536,7 +529,7 @@ defmodule Elixact.Config.Builder do
       ...> end)
       %Elixact.Config.Builder{opts: %{strict: true, extra: :forbid}}
   """
-  @spec when_true(t(), boolean() | (() -> boolean()), (t() -> t())) :: t()
+  @spec when_true(t(), boolean() | (-> boolean()), (t() -> t())) :: t()
   def when_true(%__MODULE__{} = builder, condition, config_fn) when is_function(config_fn, 1) do
     should_apply =
       case condition do
@@ -569,7 +562,7 @@ defmodule Elixact.Config.Builder do
       iex> builder |> Elixact.Config.Builder.when_false(is_development, &Elixact.Config.Builder.frozen/1)
       %Elixact.Config.Builder{...}
   """
-  @spec when_false(t(), boolean() | (() -> boolean()), (t() -> t())) :: t()
+  @spec when_false(t(), boolean() | (-> boolean()), (t() -> t())) :: t()
   def when_false(%__MODULE__{} = builder, condition, config_fn) do
     negated_condition =
       case condition do
@@ -595,7 +588,6 @@ defmodule Elixact.Config.Builder do
       iex> builder |> Elixact.Config.Builder.for_api()
       %Elixact.Config.Builder{opts: %{strict: true, extra: :forbid, ...}}
   """
-  @spec for_api(t()) :: t()
   def for_api(%__MODULE__{} = builder) do
     builder
     |> strict()
@@ -619,7 +611,6 @@ defmodule Elixact.Config.Builder do
       iex> builder |> Elixact.Config.Builder.for_json_schema()
       %Elixact.Config.Builder{opts: %{use_enum_values: true, error_format: :minimal, ...}}
   """
-  @spec for_json_schema(t()) :: t()
   def for_json_schema(%__MODULE__{} = builder) do
     builder
     |> allow_extra()
@@ -643,7 +634,6 @@ defmodule Elixact.Config.Builder do
       iex> builder |> Elixact.Config.Builder.for_development()
       %Elixact.Config.Builder{opts: %{strict: false, coercion: :aggressive, ...}}
   """
-  @spec for_development(t()) :: t()
   def for_development(%__MODULE__{} = builder) do
     builder
     |> strict(false)
@@ -668,7 +658,6 @@ defmodule Elixact.Config.Builder do
       iex> builder |> Elixact.Config.Builder.for_production()
       %Elixact.Config.Builder{opts: %{strict: true, frozen: true, ...}}
   """
-  @spec for_production(t()) :: t()
   def for_production(%__MODULE__{} = builder) do
     builder
     |> strict()

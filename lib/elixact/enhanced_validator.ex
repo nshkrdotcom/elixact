@@ -13,11 +13,11 @@ defmodule Elixact.EnhancedValidator do
   @type validation_input :: map() | term()
   @type validation_target :: DynamicSchema.t() | module() | TypeAdapter.type_spec()
   @type enhanced_options :: [
-    config: Config.t(),
-    wrapper_field: atom(),
-    json_schema_opts: keyword(),
-    type_adapter_opts: keyword()
-  ]
+          config: Config.t(),
+          wrapper_field: atom(),
+          json_schema_opts: keyword(),
+          type_adapter_opts: keyword()
+        ]
 
   @doc """
   Universal validation function that handles all types of validation targets.
@@ -58,7 +58,7 @@ defmodule Elixact.EnhancedValidator do
       {:ok, 123}
   """
   @spec validate(validation_target(), validation_input(), enhanced_options()) ::
-    {:ok, term()} | {:error, [Elixact.Error.t()]}
+          {:ok, term()} | {:error, [Elixact.Error.t()]}
   def validate(target, input, opts \\ [])
 
   # Handle DynamicSchema validation
@@ -66,7 +66,13 @@ defmodule Elixact.EnhancedValidator do
     config = Keyword.get(opts, :config, Config.create())
     validation_opts = Config.to_validation_opts(config)
 
-    Runtime.validate(input, schema, validation_opts)
+    if Keyword.get(validation_opts, :coerce, false) do
+      # Use field-by-field TypeAdapter validation for coercion
+      validate_dynamic_schema_with_coercion(schema, input, validation_opts)
+    else
+      # Use normal Runtime validation
+      Runtime.validate(input, schema, validation_opts)
+    end
   end
 
   # Handle compiled schema module validation
@@ -77,7 +83,7 @@ defmodule Elixact.EnhancedValidator do
 
       Elixact.Validator.validate_schema(schema_module, input, validation_opts[:path] || [])
     else
-      # Treat as type specification
+      # Treat as type specification (atoms like :integer, :string are valid types)
       validate_type_spec(schema_module, input, opts)
     end
   end
@@ -109,16 +115,27 @@ defmodule Elixact.EnhancedValidator do
       iex> Elixact.EnhancedValidator.validate_wrapped(:items, {:array, :string}, ["a", "b"])
       {:ok, ["a", "b"]}
   """
-  @spec validate_wrapped(atom(), TypeAdapter.type_spec(), validation_input(), enhanced_options()) ::
-    {:ok, term()} | {:error, [Elixact.Error.t()]}
   def validate_wrapped(field_name, type_spec, input, opts \\ []) do
     config = Keyword.get(opts, :config, Config.create())
 
     wrapper_opts =
       Config.to_validation_opts(config)
-      |> Keyword.take([:required, :coerce, :constraints])
+      |> Keyword.take([:required, :coerce])
+      |> Keyword.merge(Keyword.take(opts, [:constraints, :required, :coerce]))
 
-    Wrapper.wrap_and_validate(field_name, type_spec, input, wrapper_opts)
+    # Note: This function delegates to Wrapper.wrap_and_validate
+    # Type validation is handled during wrapper creation and validation
+    case Wrapper.wrap_and_validate(field_name, type_spec, input, wrapper_opts) do
+      {:ok, result} ->
+        {:ok, result}
+
+      {:error, errors} ->
+        {:error, errors}
+
+      other ->
+        {:error,
+         [Elixact.Error.new([], :validation_error, "unexpected result: #{inspect(other)}")]}
+    end
   end
 
   @doc """
@@ -142,7 +159,7 @@ defmodule Elixact.EnhancedValidator do
       {:error, %{1 => [%Elixact.Error{...}]}}
   """
   @spec validate_many(validation_target(), [validation_input()], enhanced_options()) ::
-    {:ok, [term()]} | {:error, %{integer() => [Elixact.Error.t()]}}
+          {:ok, [term()]} | {:error, %{integer() => [Elixact.Error.t()]}}
   def validate_many(target, inputs, opts \\ []) when is_list(inputs) do
     # For type specifications, use TypeAdapter for efficiency
     if is_type_spec?(target) do
@@ -168,6 +185,7 @@ defmodule Elixact.EnhancedValidator do
           validated_values =
             oks
             |> Enum.map(fn {:ok, {_index, value}} -> value end)
+
           {:ok, validated_values}
 
         {_, errors} ->
@@ -175,6 +193,7 @@ defmodule Elixact.EnhancedValidator do
             errors
             |> Enum.map(fn {:error, {index, errs}} -> {index, errs} end)
             |> Map.new()
+
           {:error, error_map}
       end
     end
@@ -199,7 +218,7 @@ defmodule Elixact.EnhancedValidator do
       {:ok, %{name: "John"}, %{"type" => "object", ...}}
   """
   @spec validate_with_schema(validation_target(), validation_input(), enhanced_options()) ::
-    {:ok, term(), map()} | {:error, [Elixact.Error.t()]}
+          {:ok, term(), map()} | {:error, [Elixact.Error.t()]}
   def validate_with_schema(target, input, opts \\ []) do
     case validate(target, input, opts) do
       {:ok, validated_data} ->
@@ -229,7 +248,7 @@ defmodule Elixact.EnhancedValidator do
       {:ok, validated_data, %{"type" => "object", ...}}
   """
   @spec validate_with_resolved_schema(validation_target(), validation_input(), enhanced_options()) ::
-    {:ok, term(), map()} | {:error, [Elixact.Error.t()]}
+          {:ok, term(), map()} | {:error, [Elixact.Error.t()]}
   def validate_with_resolved_schema(target, input, opts \\ []) do
     case validate_with_schema(target, input, opts) do
       {:ok, validated_data, json_schema} ->
@@ -261,11 +280,13 @@ defmodule Elixact.EnhancedValidator do
       {:ok, validated_data, %{"type" => "object", "additionalProperties" => false}}
   """
   @spec validate_for_llm(validation_target(), validation_input(), atom(), enhanced_options()) ::
-    {:ok, term(), map()} | {:error, [Elixact.Error.t()]}
+          {:ok, term(), map()} | {:error, [Elixact.Error.t()]}
   def validate_for_llm(target, input, provider, opts \\ []) do
     case validate_with_schema(target, input, opts) do
       {:ok, validated_data, json_schema} ->
-        provider_schema = JsonSchema.Resolver.enforce_structured_output(json_schema, provider: provider)
+        provider_schema =
+          JsonSchema.Resolver.enforce_structured_output(json_schema, provider: provider)
+
         {:ok, validated_data, provider_schema}
 
       {:error, errors} ->
@@ -292,7 +313,7 @@ defmodule Elixact.EnhancedValidator do
       {:ok, "HELLO"}
   """
   @spec pipeline([term()], term(), enhanced_options()) ::
-    {:ok, term()} | {:error, {integer(), [Elixact.Error.t()]}}
+          {:ok, term()} | {:error, {integer(), [Elixact.Error.t()]}}
   def pipeline(steps, input, opts \\ []) do
     steps
     |> Enum.with_index()
@@ -306,8 +327,94 @@ defmodule Elixact.EnhancedValidator do
 
   # Private helper functions
 
+  @spec validate_dynamic_schema_with_coercion(DynamicSchema.t(), map(), keyword()) ::
+          {:ok, map()} | {:error, [Elixact.Error.t()]}
+  defp validate_dynamic_schema_with_coercion(%DynamicSchema{} = schema, input, validation_opts) do
+    path = Keyword.get(validation_opts, :path, [])
+
+    # Handle nil or non-map input
+    if not is_map(input) do
+      error = Elixact.Error.new(path, :type, "expected a map, got: #{inspect(input)}")
+      {:error, [error]}
+    else
+      # Validate each field with coercion using TypeAdapter
+      result =
+        Enum.reduce_while(schema.fields, {:ok, %{}}, fn {field_name, field_meta}, {:ok, acc} ->
+          field_path = path ++ [field_name]
+
+          # Get field value from input (supporting both atom and string keys)
+          field_value = Map.get(input, field_name) || Map.get(input, Atom.to_string(field_name))
+
+          case {field_value, field_meta} do
+            {nil, %Elixact.FieldMeta{default: default}} when not is_nil(default) ->
+              # Use default value
+              {:cont, {:ok, Map.put(acc, field_name, default)}}
+
+            {nil, %Elixact.FieldMeta{required: false}} ->
+              # Optional field without value
+              {:cont, {:ok, acc}}
+
+            {nil, %Elixact.FieldMeta{required: true}} ->
+              # Required field missing
+              error = Elixact.Error.new(field_path, :required, "field is required")
+              {:halt, {:error, [error]}}
+
+            {value, _} ->
+              # Validate field with coercion
+              case TypeAdapter.validate(field_meta.type, value, coerce: true, path: field_path) do
+                {:ok, validated_value} ->
+                  {:cont, {:ok, Map.put(acc, field_name, validated_value)}}
+
+                {:error, errors} ->
+                  {:halt, {:error, errors}}
+              end
+          end
+        end)
+
+      case result do
+        {:ok, validated_fields} ->
+          # Check for extra fields if strict mode is enabled
+          if Keyword.get(validation_opts, :strict, false) do
+            validate_strict_mode_enhanced(schema, validated_fields, input, path)
+          else
+            {:ok, validated_fields}
+          end
+
+        {:error, errors} ->
+          {:error, errors}
+      end
+    end
+  end
+
+  @spec validate_strict_mode_enhanced(DynamicSchema.t(), map(), map(), [atom()]) ::
+          {:ok, map()} | {:error, [Elixact.Error.t()]}
+  defp validate_strict_mode_enhanced(
+         %DynamicSchema{} = schema,
+         validated_fields,
+         original_input,
+         path
+       ) do
+    allowed_keys = Map.keys(schema.fields) |> Enum.map(&Atom.to_string/1) |> MapSet.new()
+    input_keys = Map.keys(original_input) |> Enum.map(&to_string/1) |> MapSet.new()
+
+    case MapSet.difference(input_keys, allowed_keys) |> MapSet.to_list() do
+      [] ->
+        {:ok, validated_fields}
+
+      extra_keys ->
+        error =
+          Elixact.Error.new(
+            path,
+            :additional_properties,
+            "unknown fields: #{inspect(extra_keys)}"
+          )
+
+        {:error, [error]}
+    end
+  end
+
   @spec execute_pipeline_step(term(), term(), enhanced_options()) ::
-    {:ok, term()} | {:error, [Elixact.Error.t()]}
+          {:ok, term()} | {:error, [Elixact.Error.t()]}
   defp execute_pipeline_step(step, value, opts) do
     case step do
       # Function transformation
@@ -315,7 +422,8 @@ defmodule Elixact.EnhancedValidator do
         case fun.(value) do
           {:ok, transformed} -> {:ok, transformed}
           {:error, error} -> {:error, [error]}
-          other -> {:ok, other}  # Assume direct transformation
+          # Assume direct transformation
+          other -> {:ok, other}
         end
 
       # Type validation
@@ -325,9 +433,26 @@ defmodule Elixact.EnhancedValidator do
   end
 
   @spec validate_type_spec(TypeAdapter.type_spec(), validation_input(), enhanced_options()) ::
-    {:ok, term()} | {:error, [Elixact.Error.t()]}
+          {:ok, term()} | {:error, [Elixact.Error.t()]}
   defp validate_type_spec(type_spec, input, opts) do
+    # Check if it's a non-existent module being treated as a type spec
+    if is_atom(type_spec) do
+      atom_str = Atom.to_string(type_spec)
+      normalized = Elixact.Types.normalize_type(type_spec)
+
+      # If normalize_type returns the atom unchanged (not a known type or schema),
+      # and it looks like a module name, it's likely invalid
+      if is_atom(normalized) and normalized == type_spec and String.match?(atom_str, ~r/^[A-Z]/) do
+        # Double-check: if it's an atom that normalize_type didn't transform,
+        # and it starts with a capital letter, check if it's a valid module
+        unless Code.ensure_loaded?(type_spec) and function_exported?(type_spec, :__schema__, 1) do
+          raise ArgumentError, "Module #{inspect(type_spec)} does not exist"
+        end
+      end
+    end
+
     config = Keyword.get(opts, :config, Config.create())
+
     type_adapter_opts =
       Config.to_validation_opts(config)
       |> Keyword.merge(Keyword.get(opts, :type_adapter_opts, []))
@@ -337,8 +462,23 @@ defmodule Elixact.EnhancedValidator do
 
   @spec generate_json_schema(validation_target(), enhanced_options()) :: map()
   defp generate_json_schema(%DynamicSchema{} = schema, opts) do
+    config = Keyword.get(opts, :config, Config.create())
     json_schema_opts = Keyword.get(opts, :json_schema_opts, [])
-    Runtime.to_json_schema(schema, json_schema_opts)
+
+    # Extract config settings that should influence JSON schema generation
+    schema_opts =
+      json_schema_opts
+      |> Keyword.put_new(:strict, config.strict)
+      |> Keyword.put_new(
+        :additional_properties,
+        if config.strict do
+          false
+        else
+          json_schema_opts[:additional_properties]
+        end
+      )
+
+    Runtime.to_json_schema(schema, schema_opts)
   end
 
   defp generate_json_schema(schema_module, opts) when is_atom(schema_module) do
@@ -358,9 +498,11 @@ defmodule Elixact.EnhancedValidator do
 
   @spec is_type_spec?(term()) :: boolean()
   defp is_type_spec?(%DynamicSchema{}), do: false
+
   defp is_type_spec?(atom) when is_atom(atom) do
     not (Code.ensure_loaded?(atom) and function_exported?(atom, :__schema__, 1))
   end
+
   defp is_type_spec?(_), do: true
 
   @doc """
@@ -408,7 +550,6 @@ defmodule Elixact.EnhancedValidator do
     }
   end
 
-  @spec analyze_target(validation_target()) :: map()
   defp analyze_target(%DynamicSchema{} = schema) do
     %{
       type: :dynamic_schema,
@@ -441,7 +582,6 @@ defmodule Elixact.EnhancedValidator do
     }
   end
 
-  @spec analyze_input(validation_input()) :: map()
   defp analyze_input(input) when is_map(input) do
     %{
       type: :map,
@@ -523,7 +663,6 @@ defmodule Elixact.EnhancedValidator do
       }
   end
 
-  @spec get_type(term()) :: atom()
   defp get_type(value) when is_binary(value), do: :string
   defp get_type(value) when is_integer(value), do: :integer
   defp get_type(value) when is_float(value), do: :float

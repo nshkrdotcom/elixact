@@ -13,7 +13,7 @@ defmodule TestHelpers do
   @moduledoc """
   Helper functions for Elixact tests.
   """
-  
+
   import ExUnit.Assertions
 
   @doc """
@@ -25,7 +25,7 @@ defmodule TestHelpers do
       {:age, :integer, [required: false, gt: 0]},
       {:email, :string, [required: true, format: ~r/@/]}
     ]
-    
+
     Elixact.Runtime.create_schema(fields || default_fields, title: "Test Schema")
   end
 
@@ -38,7 +38,7 @@ defmodule TestHelpers do
       age: 30,
       email: "john@example.com"
     }
-    
+
     Map.merge(default_data, overrides)
   end
 
@@ -47,8 +47,10 @@ defmodule TestHelpers do
   """
   def assert_valid(result) do
     case result do
-      {:ok, validated} -> validated
-      {:error, errors} -> 
+      {:ok, validated} ->
+        validated
+
+      {:error, errors} ->
         flunk("Expected validation to succeed, but got errors: #{inspect(errors)}")
     end
   end
@@ -60,18 +62,20 @@ defmodule TestHelpers do
     case result do
       {:error, errors} when is_list(errors) ->
         if expected_code do
-          assert Enum.any?(errors, &(&1.code == expected_code)), 
-            "Expected error code #{expected_code}, but got: #{inspect(Enum.map(errors, & &1.code))}"
+          assert Enum.any?(errors, &(&1.code == expected_code)),
+                 "Expected error code #{expected_code}, but got: #{inspect(Enum.map(errors, & &1.code))}"
         end
+
         errors
-        
+
       {:error, error} ->
         if expected_code do
-          assert error.code == expected_code, 
-            "Expected error code #{expected_code}, but got: #{error.code}"
+          assert error.code == expected_code,
+                 "Expected error code #{expected_code}, but got: #{error.code}"
         end
+
         error
-        
+
       {:ok, _} ->
         flunk("Expected validation to fail, but it succeeded")
     end
@@ -89,8 +93,10 @@ defmodule TestHelpers do
   """
   def assert_performance(fun, max_time_us) when is_function(fun, 0) do
     {time_us, result} = measure_time(fun)
-    assert time_us <= max_time_us, 
-      "Execution took #{time_us}μs, expected <= #{max_time_us}μs"
+
+    assert time_us <= max_time_us,
+           "Execution took #{time_us}μs, expected <= #{max_time_us}μs"
+
     result
   end
 
@@ -113,10 +119,11 @@ defmodule TestHelpers do
   Runs a function concurrently across multiple processes.
   """
   def run_concurrent(fun, count \\ 10) when is_function(fun, 1) do
-    tasks = for i <- 1..count do
-      Task.async(fn -> fun.(i) end)
-    end
-    
+    tasks =
+      for i <- 1..count do
+        Task.async(fn -> fun.(i) end)
+      end
+
     Task.await_many(tasks, 30_000)
   end
 
@@ -133,12 +140,15 @@ defmodule TestHelpers do
   Creates a complex nested type specification for testing.
   """
   def complex_type_spec do
-    {:map, {:string, {:union, [
-      :string,
-      :integer,
-      {:array, :string},
-      {:map, {:string, :any}}
-    ]}}}
+    {:map,
+     {:string,
+      {:union,
+       [
+         :string,
+         :integer,
+         {:array, :string},
+         {:map, {:string, :any}}
+       ]}}}
   end
 
   @doc """
@@ -162,19 +172,21 @@ defmodule TestHelpers do
   def assert_valid_json_schema(schema) do
     # Basic JSON Schema validation
     assert is_map(schema)
-    assert Map.has_key?(schema, "type") or Map.has_key?(schema, "oneOf") or Map.has_key?(schema, "anyOf")
-    
+
+    assert Map.has_key?(schema, "type") or Map.has_key?(schema, "oneOf") or
+             Map.has_key?(schema, "anyOf")
+
     # If it's an object schema, should have properties
     if schema["type"] == "object" do
       assert Map.has_key?(schema, "properties")
       assert is_map(schema["properties"])
     end
-    
+
     # If it has required fields, they should be a list
     if Map.has_key?(schema, "required") do
       assert is_list(schema["required"])
     end
-    
+
     schema
   end
 
@@ -188,7 +200,7 @@ defmodule TestHelpers do
       coercion: :safe,
       error_format: :detailed
     }
-    
+
     Elixact.Config.create(Map.merge(base_config, overrides))
   end
 
@@ -199,7 +211,7 @@ defmodule TestHelpers do
     # Normalize both schemas for comparison
     norm1 = normalize_schema(schema1)
     norm2 = normalize_schema(schema2)
-    
+
     assert norm1 == norm2, """
     Schemas are not equivalent:
     Schema 1: #{inspect(norm1)}
@@ -276,6 +288,7 @@ defmodule TestHelpers do
 
   defp generate_random_value({:array, inner_type}) do
     size = :rand.uniform(5)
+
     for _ <- 1..size do
       generate_random_value(inner_type)
     end
@@ -283,9 +296,11 @@ defmodule TestHelpers do
 
   defp generate_random_value({:map, {key_type, value_type}}) do
     size = :rand.uniform(3)
+
     for _i <- 1..size do
       {generate_random_value(key_type), generate_random_value(value_type)}
-    end |> Map.new()
+    end
+    |> Map.new()
   end
 
   defp generate_random_value({:union, types}) do
@@ -307,20 +322,21 @@ defmodule PerformanceTestHelpers do
   """
   def benchmark(name, fun, iterations \\ 100) do
     IO.puts("Running benchmark: #{name}")
-    
-    times = for _ <- 1..iterations do
-      {time, _result} = :timer.tc(fun)
-      time
-    end
-    
+
+    times =
+      for _ <- 1..iterations do
+        {time, _result} = :timer.tc(fun)
+        time
+      end
+
     avg_time = Enum.sum(times) / length(times)
     min_time = Enum.min(times)
     max_time = Enum.max(times)
-    
+
     IO.puts("  Average: #{Float.round(avg_time, 2)}μs")
     IO.puts("  Min: #{min_time}μs")
     IO.puts("  Max: #{max_time}μs")
-    
+
     %{
       name: name,
       average: avg_time,
@@ -336,14 +352,14 @@ defmodule PerformanceTestHelpers do
   def compare_performance(name1, fun1, name2, fun2, iterations \\ 100) do
     result1 = benchmark(name1, fun1, iterations)
     result2 = benchmark(name2, fun2, iterations)
-    
+
     ratio = result1.average / result2.average
-    
+
     IO.puts("\nPerformance comparison:")
     IO.puts("  #{name1}: #{Float.round(result1.average, 2)}μs")
     IO.puts("  #{name2}: #{Float.round(result2.average, 2)}μs")
     IO.puts("  Ratio: #{Float.round(ratio, 2)}x")
-    
+
     %{
       first: result1,
       second: result2,
@@ -357,7 +373,7 @@ defmodule MemoryTestHelpers do
   @moduledoc """
   Helpers for testing memory usage and garbage collection.
   """
-  
+
   import ExUnit.Assertions
 
   @doc """
@@ -366,14 +382,14 @@ defmodule MemoryTestHelpers do
   def measure_memory(fun) do
     :erlang.garbage_collect()
     {memory_before, _} = :erlang.process_info(self(), :memory)
-    
+
     result = fun.()
-    
+
     :erlang.garbage_collect()
     {memory_after, _} = :erlang.process_info(self(), :memory)
-    
+
     memory_used = memory_after - memory_before
-    
+
     {result, memory_used}
   end
 
@@ -382,10 +398,10 @@ defmodule MemoryTestHelpers do
   """
   def assert_memory_usage(fun, max_memory_bytes) do
     {result, memory_used} = measure_memory(fun)
-    
+
     assert memory_used <= max_memory_bytes,
-      "Memory usage #{memory_used} bytes exceeded limit #{max_memory_bytes} bytes"
-    
+           "Memory usage #{memory_used} bytes exceeded limit #{max_memory_bytes} bytes"
+
     result
   end
 end

@@ -1,7 +1,7 @@
 defmodule Elixact.TypeAdapter.Instance do
   @moduledoc """
   A reusable TypeAdapter instance for efficient validation and serialization.
-  
+
   This module provides a struct that encapsulates a type specification and
   configuration options, allowing for efficient reuse of the same type
   validation and serialization logic.
@@ -11,10 +11,14 @@ defmodule Elixact.TypeAdapter.Instance do
 
   @enforce_keys [:type_spec, :normalized_type]
   defstruct [
-    :type_spec,       # Original type specification
-    :normalized_type, # Normalized type definition
-    :config,          # Configuration options
-    :json_schema      # Cached JSON schema
+    # Original type specification
+    :type_spec,
+    # Normalized type definition
+    :normalized_type,
+    # Configuration options
+    :config,
+    # Cached JSON schema
+    :json_schema
   ]
 
   @type t :: %__MODULE__{
@@ -56,8 +60,8 @@ defmodule Elixact.TypeAdapter.Instance do
     }
 
     normalized_type = Elixact.Types.normalize_type(type_spec)
-    
-    json_schema = 
+
+    json_schema =
       if config.cache_json_schema do
         TypeAdapter.json_schema(type_spec)
       else
@@ -96,7 +100,7 @@ defmodule Elixact.TypeAdapter.Instance do
   """
   @spec validate(t(), term(), keyword()) :: {:ok, term()} | {:error, [Elixact.Error.t()]}
   def validate(%__MODULE__{} = instance, value, opts \\ []) do
-    validation_opts = 
+    validation_opts =
       instance.config
       |> Map.merge(Map.new(opts))
       |> Map.to_list()
@@ -227,10 +231,10 @@ defmodule Elixact.TypeAdapter.Instance do
       iex> Elixact.TypeAdapter.Instance.validate_many(adapter, [1, "bad", 3])
       {:error, %{1 => [%Elixact.Error{...}]}}
   """
-  @spec validate_many(t(), [term()], keyword()) :: 
-    {:ok, [term()]} | {:error, %{integer() => [Elixact.Error.t()]}}
+  @spec validate_many(t(), [term()], keyword()) ::
+          {:ok, [term()]} | {:error, %{integer() => [Elixact.Error.t()]}}
   def validate_many(%__MODULE__{} = instance, values, opts \\ []) do
-    results = 
+    results =
       values
       |> Enum.with_index()
       |> Enum.map(fn {value, index} ->
@@ -242,16 +246,18 @@ defmodule Elixact.TypeAdapter.Instance do
 
     case Enum.split_with(results, &match?({:ok, _}, &1)) do
       {oks, []} ->
-        validated_values = 
+        validated_values =
           oks
           |> Enum.map(fn {:ok, {_index, value}} -> value end)
+
         {:ok, validated_values}
 
       {_, errors} ->
-        error_map = 
+        error_map =
           errors
           |> Enum.map(fn {:error, {index, errs}} -> {index, errs} end)
           |> Map.new()
+
         {:error, error_map}
     end
   end
@@ -274,10 +280,10 @@ defmodule Elixact.TypeAdapter.Instance do
       iex> Elixact.TypeAdapter.Instance.dump_many(adapter, ["a", "b", "c"])
       {:ok, ["a", "b", "c"]}
   """
-  @spec dump_many(t(), [term()], keyword()) :: 
-    {:ok, [term()]} | {:error, %{integer() => String.t()}}
+  @spec dump_many(t(), [term()], keyword()) ::
+          {:ok, [term()]} | {:error, %{integer() => String.t()}}
   def dump_many(%__MODULE__{} = instance, values, opts \\ []) do
-    results = 
+    results =
       values
       |> Enum.with_index()
       |> Enum.map(fn {value, index} ->
@@ -289,16 +295,18 @@ defmodule Elixact.TypeAdapter.Instance do
 
     case Enum.split_with(results, &match?({:ok, _}, &1)) do
       {oks, []} ->
-        serialized_values = 
+        serialized_values =
           oks
           |> Enum.map(fn {:ok, {_index, value}} -> value end)
+
         {:ok, serialized_values}
 
       {_, errors} ->
-        error_map = 
+        error_map =
           errors
           |> Enum.map(fn {:error, {index, reason}} -> {index, reason} end)
           |> Map.new()
+
         {:error, error_map}
     end
   end

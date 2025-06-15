@@ -65,6 +65,7 @@ defmodule Elixact.TypeAdapterTest do
 
     test "validates complex nested structures" do
       type_spec = {:map, {:string, {:array, {:union, [:string, :integer]}}}}
+
       value = %{
         "numbers" => [1, 2, 3],
         "mixed" => ["hello", 42, "world"]
@@ -80,7 +81,9 @@ defmodule Elixact.TypeAdapterTest do
 
       assert {:ok, "hello"} = TypeAdapter.validate(type_spec, "hello")
       assert {:error, [%Error{code: :min_length}]} = TypeAdapter.validate(type_spec, "hi")
-      assert {:error, [%Error{code: :max_length}]} = TypeAdapter.validate(type_spec, "this is too long")
+
+      assert {:error, [%Error{code: :max_length}]} =
+               TypeAdapter.validate(type_spec, "this is too long")
     end
 
     test "validates numeric range constraints" do
@@ -96,7 +99,9 @@ defmodule Elixact.TypeAdapterTest do
 
       assert {:ok, ["a", "b"]} = TypeAdapter.validate(type_spec, ["a", "b"])
       assert {:error, [%Error{code: :min_items}]} = TypeAdapter.validate(type_spec, ["a"])
-      assert {:error, [%Error{code: :max_items}]} = TypeAdapter.validate(type_spec, ["a", "b", "c", "d", "e"])
+
+      assert {:error, [%Error{code: :max_items}]} =
+               TypeAdapter.validate(type_spec, ["a", "b", "c", "d", "e"])
     end
 
     test "validates format constraints" do
@@ -317,6 +322,7 @@ defmodule Elixact.TypeAdapterTest do
 
     test "handles complex nested validation efficiently" do
       type_spec = {:map, {:string, {:array, {:union, [:string, :integer]}}}}
+
       value = %{
         "list1" => Enum.to_list(1..100),
         "list2" => Enum.map(1..100, &to_string/1),

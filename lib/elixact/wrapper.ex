@@ -18,13 +18,13 @@ defmodule Elixact.Wrapper do
 
   @type wrapper_schema :: DynamicSchema.t()
   @type wrapper_options :: [
-    required: boolean(),
-    coerce: boolean(),
-    constraints: [term()],
-    description: String.t(),
-    example: term(),
-    default: term()
-  ]
+          required: boolean(),
+          coerce: boolean(),
+          constraints: [term()],
+          description: String.t(),
+          example: term(),
+          default: term()
+        ]
 
   @doc """
   Creates a temporary wrapper schema for validating a single value.
@@ -56,12 +56,20 @@ defmodule Elixact.Wrapper do
   """
   @spec create_wrapper(atom(), TypeAdapter.type_spec(), wrapper_options()) :: wrapper_schema()
   def create_wrapper(field_name, type_spec, opts \\ []) do
+    # Validate field_name is a valid atom
+    unless is_atom(field_name) and not is_nil(field_name) do
+      raise ArgumentError, "field_name must be a non-nil atom"
+    end
+
+    # Note: Type specification validation is handled during schema creation and validation
+
     # Extract wrapper options
     required = Keyword.get(opts, :required, true)
     description = Keyword.get(opts, :description)
     example = Keyword.get(opts, :example)
     default = Keyword.get(opts, :default)
     constraints = Keyword.get(opts, :constraints, [])
+    coerce = Keyword.get(opts, :coerce, false)
 
     # Create field definition with constraints
     field_definition = {
@@ -79,12 +87,16 @@ defmodule Elixact.Wrapper do
     wrapper_name = "Wrapper_#{field_name}_#{System.unique_integer([:positive])}"
 
     # Create runtime schema with single field
-    Runtime.create_schema(
-      [field_definition],
-      name: wrapper_name,
-      title: "Wrapper for #{field_name}",
-      description: "Temporary validation schema for #{field_name}"
-    )
+    schema =
+      Runtime.create_schema(
+        [field_definition],
+        name: wrapper_name,
+        title: "Wrapper for #{field_name}",
+        description: "Temporary validation schema for #{field_name}"
+      )
+
+    # Store coercion setting in metadata for later use
+    %{schema | metadata: Map.put(schema.metadata, :coerce, coerce)}
   end
 
   @doc """
@@ -112,21 +124,37 @@ defmodule Elixact.Wrapper do
       {:error, [%Elixact.Error{...}]}
   """
   @spec validate_and_extract(wrapper_schema(), term(), atom()) ::
-    {:ok, term()} | {:error, [Elixact.Error.t()]}
+          {:ok, term()} | {:error, [Elixact.Error.t()]}
   def validate_and_extract(%DynamicSchema{} = wrapper_schema, data, field_name) do
+    # Get field metadata to check the expected type
+    field_meta = Map.get(wrapper_schema.fields, field_name)
+
     # Normalize data to map format if needed
-    normalized_data = normalize_wrapper_data(data, field_name)
+    normalized_data = normalize_wrapper_data(data, field_name, field_meta)
 
-    case Runtime.validate(normalized_data, wrapper_schema) do
-      {:ok, validated_map} ->
-        # Extract the field value
-        case Map.get(validated_map, field_name) do
-          nil -> {:error, [Elixact.Error.new([field_name], :missing, "field not found in validated result")]}
-          value -> {:ok, value}
-        end
+    # Check if coercion is enabled for this wrapper
+    coerce_enabled = Map.get(wrapper_schema.metadata, :coerce, false)
 
-      {:error, errors} ->
-        {:error, errors}
+    if coerce_enabled do
+      # Use TypeAdapter for coercion-enabled validation
+      validate_with_coercion(wrapper_schema, normalized_data, field_name)
+    else
+      # Use normal Runtime validation
+      case Runtime.validate(normalized_data, wrapper_schema) do
+        {:ok, validated_map} ->
+          # Extract the field value
+          case Map.get(validated_map, field_name) do
+            nil ->
+              {:error,
+               [Elixact.Error.new([field_name], :missing, "field not found in validated result")]}
+
+            value ->
+              {:ok, value}
+          end
+
+        {:error, errors} ->
+          {:error, errors}
+      end
     end
   end
 
@@ -157,7 +185,7 @@ defmodule Elixact.Wrapper do
       {:ok, ["a", "b", "c"]}
   """
   @spec wrap_and_validate(atom(), TypeAdapter.type_spec(), term(), wrapper_options()) ::
-    {:ok, term()} | {:error, [Elixact.Error.t()]}
+          {:ok, term()} | {:error, [Elixact.Error.t()]}
   def wrap_and_validate(field_name, type_spec, input, opts \\ []) do
     wrapper_schema = create_wrapper(field_name, type_spec, opts)
     validate_and_extract(wrapper_schema, input, field_name)
@@ -183,8 +211,11 @@ defmodule Elixact.Wrapper do
       iex> wrappers = Elixact.Wrapper.create_multiple_wrappers(specs)
       %{name: %DynamicSchema{...}, age: %DynamicSchema{...}, email: %DynamicSchema{...}}
   """
-  @spec create_multiple_wrappers([{atom(), TypeAdapter.type_spec(), wrapper_options()}], wrapper_options()) ::
-    %{atom() => wrapper_schema()}
+  @spec create_multiple_wrappers(
+          [{atom(), TypeAdapter.type_spec(), wrapper_options()}],
+          wrapper_options()
+        ) ::
+          %{atom() => wrapper_schema()}
   def create_multiple_wrappers(field_specs, global_opts \\ []) do
     field_specs
     |> Enum.map(fn {field_name, type_spec, opts} ->
@@ -217,14 +248,15 @@ defmodule Elixact.Wrapper do
       {:ok, %{name: "John", age: 30}}
   """
   @spec validate_multiple(%{atom() => wrapper_schema()}, %{atom() => term()}) ::
-    {:ok, %{atom() => term()}} | {:error, %{atom() => [Elixact.Error.t()]}}
+          {:ok, %{atom() => term()}} | {:error, %{atom() => [Elixact.Error.t()]}}
   def validate_multiple(wrappers, data) when is_map(wrappers) and is_map(data) do
     results =
       wrappers
       |> Enum.map(fn {field_name, wrapper_schema} ->
         case Map.get(data, field_name) do
           nil ->
-            {field_name, {:error, [Elixact.Error.new([field_name], :missing, "field not provided")]}}
+            {field_name,
+             {:error, [Elixact.Error.new([field_name], :missing, "field not provided")]}}
 
           value ->
             case validate_and_extract(wrapper_schema, value, field_name) do
@@ -240,6 +272,7 @@ defmodule Elixact.Wrapper do
           oks
           |> Enum.map(fn {field_name, {:ok, value}} -> {field_name, value} end)
           |> Map.new()
+
         {:ok, validated_map}
 
       {_, errors} ->
@@ -247,6 +280,7 @@ defmodule Elixact.Wrapper do
           errors
           |> Enum.map(fn {field_name, {:error, errs}} -> {field_name, errs} end)
           |> Map.new()
+
         {:error, error_map}
     end
   end
@@ -272,7 +306,7 @@ defmodule Elixact.Wrapper do
       iex> admin_email_wrapper = email_wrapper_factory.(:admin_email, required: false)
   """
   @spec create_wrapper_factory(TypeAdapter.type_spec(), wrapper_options()) ::
-    (atom() -> wrapper_schema())
+          (atom() -> wrapper_schema())
   def create_wrapper_factory(type_spec, base_opts \\ []) do
     fn field_name ->
       create_wrapper(field_name, type_spec, base_opts)
@@ -413,7 +447,8 @@ defmodule Elixact.Wrapper do
       iex> Elixact.Wrapper.validate_flexible(wrapper, %{"age" => 25}, :age) # Map with string key
       {:ok, 25}
   """
-  @spec create_flexible_wrapper(atom(), TypeAdapter.type_spec(), wrapper_options()) :: wrapper_schema()
+  @spec create_flexible_wrapper(atom(), TypeAdapter.type_spec(), wrapper_options()) ::
+          wrapper_schema()
   def create_flexible_wrapper(field_name, type_spec, opts \\ []) do
     create_wrapper(field_name, type_spec, opts)
   end
@@ -431,7 +466,7 @@ defmodule Elixact.Wrapper do
     * `{:error, errors}` on failure
   """
   @spec validate_flexible(wrapper_schema(), term(), atom()) ::
-    {:ok, term()} | {:error, [Elixact.Error.t()]}
+          {:ok, term()} | {:error, [Elixact.Error.t()]}
   def validate_flexible(%DynamicSchema{} = wrapper_schema, data, field_name) do
     normalized_data = normalize_flexible_data(data, field_name)
     validate_and_extract(wrapper_schema, normalized_data, field_name)
@@ -439,18 +474,58 @@ defmodule Elixact.Wrapper do
 
   # Private helper functions
 
-  @spec normalize_wrapper_data(term(), atom()) :: map()
-  defp normalize_wrapper_data(data, field_name) when is_map(data) do
-    # If data is already a map, ensure the field exists with atom key
-    case {Map.get(data, field_name), Map.get(data, Atom.to_string(field_name))} do
-      {nil, nil} -> Map.put(%{}, field_name, data)  # Treat entire map as field value
-      {value, nil} -> %{field_name => value}        # Atom key found
-      {nil, value} -> %{field_name => value}        # String key found
-      {atom_value, _} -> %{field_name => atom_value} # Prefer atom key
+  @spec validate_with_coercion(wrapper_schema(), map(), atom()) ::
+          {:ok, term()} | {:error, [Elixact.Error.t()]}
+  defp validate_with_coercion(%DynamicSchema{} = wrapper_schema, normalized_data, field_name) do
+    # Get the field metadata
+    field_meta = Map.get(wrapper_schema.fields, field_name)
+
+    if field_meta do
+      # Extract the value to validate
+      value = Map.get(normalized_data, field_name)
+
+      # Use TypeAdapter for validation with coercion
+      case TypeAdapter.validate(field_meta.type, value, coerce: true, path: [field_name]) do
+        {:ok, validated_value} ->
+          {:ok, validated_value}
+
+        {:error, errors} ->
+          {:error, errors}
+      end
+    else
+      {:error, [Elixact.Error.new([field_name], :missing, "field not found in wrapper schema")]}
     end
   end
 
-  defp normalize_wrapper_data(data, field_name) do
+  @spec normalize_wrapper_data(term(), atom(), Elixact.FieldMeta.t() | nil) :: map()
+  defp normalize_wrapper_data(data, field_name, field_meta) when is_map(data) do
+    # If data is already a map, check if the field exists with atom or string key
+    case {Map.get(data, field_name), Map.get(data, Atom.to_string(field_name))} do
+      {nil, nil} ->
+        # Field not found in map - decide whether to treat map as field value or report missing
+        if should_treat_map_as_value?(data, field_meta) do
+          # Field type is compatible with maps, treat entire map as the field value
+          %{field_name => data}
+        else
+          # Field type is not map-compatible, leave empty so validation reports missing field
+          %{}
+        end
+
+      # Atom key found
+      {value, nil} ->
+        %{field_name => value}
+
+      # String key found
+      {nil, value} ->
+        %{field_name => value}
+
+      # Prefer atom key
+      {atom_value, _} ->
+        %{field_name => atom_value}
+    end
+  end
+
+  defp normalize_wrapper_data(data, field_name, _field_meta) do
     # For non-map data, wrap it in a map with the field name
     %{field_name => data}
   end
@@ -476,5 +551,41 @@ defmodule Elixact.Wrapper do
   defp normalize_flexible_data(data, field_name) do
     # For non-map data, wrap it
     %{field_name => data}
+  end
+
+  @spec should_treat_map_as_value?(map(), Elixact.FieldMeta.t() | nil) :: boolean()
+  defp should_treat_map_as_value?(_data, nil), do: false
+
+  defp should_treat_map_as_value?(_data, field_meta) do
+    # Check if the field type is compatible with map data
+    case field_meta.type do
+      # Map type with key/value types - treat data as map value
+      {:map, _, _} ->
+        true
+
+      # Map type - treat data as map value
+      {:map, _} ->
+        true
+
+      # Map type - treat data as map value
+      {:type, :map, _} ->
+        true
+
+      # Map type - treat data as map value
+      :map ->
+        true
+
+      # Any type - could be a map
+      {:type, :any, _} ->
+        true
+
+      # Any type - could be a map
+      :any ->
+        true
+
+      _ ->
+        # For non-map types, don't treat map as value - let validation handle defaults/missing
+        false
+    end
   end
 end

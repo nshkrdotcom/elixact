@@ -52,9 +52,10 @@ defmodule Elixact.EnhancedValidatorTest do
 
   describe "validate_wrapped/4" do
     test "validates and unwraps single field" do
-      result = EnhancedValidator.validate_wrapped(:score, :integer, "85",
-        config: Config.create(coercion: :safe)
-      )
+      result =
+        EnhancedValidator.validate_wrapped(:score, :integer, "85",
+          config: Config.create(coercion: :safe)
+        )
 
       assert {:ok, 85} = result
     end
@@ -67,10 +68,11 @@ defmodule Elixact.EnhancedValidatorTest do
     end
 
     test "applies constraints in wrapper validation" do
-      result = EnhancedValidator.validate_wrapped(:score, :integer, 150,
-        config: Config.create(strict: true),
-        constraints: [gteq: 0, lteq: 100]
-      )
+      result =
+        EnhancedValidator.validate_wrapped(:score, :integer, 150,
+          config: Config.create(strict: true),
+          constraints: [gteq: 0, lteq: 100]
+        )
 
       assert {:error, [%Error{code: :lteq}]} = result
     end
@@ -125,7 +127,9 @@ defmodule Elixact.EnhancedValidatorTest do
       type_spec = {:array, :string}
       data = ["a", "b", "c"]
 
-      assert {:ok, validated, json_schema} = EnhancedValidator.validate_with_schema(type_spec, data)
+      assert {:ok, validated, json_schema} =
+               EnhancedValidator.validate_with_schema(type_spec, data)
+
       assert validated == data
       assert json_schema["type"] == "array"
       assert json_schema["items"]["type"] == "string"
@@ -135,13 +139,17 @@ defmodule Elixact.EnhancedValidatorTest do
   describe "validate_with_resolved_schema/3" do
     test "resolves all references in schema" do
       # Create schema that would have references if it were more complex
-      schema = Runtime.create_schema([
-        {:data, {:map, {:string, :any}}, []},
-        {:items, {:array, :string}, []}
-      ])
+      schema =
+        Runtime.create_schema([
+          {:data, {:map, {:string, :any}}, []},
+          {:items, {:array, :string}, []}
+        ])
+
       data = %{data: %{"key" => "value"}, items: ["a", "b"]}
 
-      assert {:ok, validated, resolved_schema} = EnhancedValidator.validate_with_resolved_schema(schema, data)
+      assert {:ok, validated, resolved_schema} =
+               EnhancedValidator.validate_with_resolved_schema(schema, data)
+
       assert validated.data["key"] == "value"
 
       # Resolved schema should not have $ref entries
@@ -153,11 +161,13 @@ defmodule Elixact.EnhancedValidatorTest do
       data = [1, 2, 3]
 
       resolver_opts = [max_depth: 5, preserve_titles: true]
-      assert {:ok, _, resolved} = EnhancedValidator.validate_with_resolved_schema(
-        type_spec,
-        data,
-        json_schema_opts: resolver_opts
-      )
+
+      assert {:ok, _, resolved} =
+               EnhancedValidator.validate_with_resolved_schema(
+                 type_spec,
+                 data,
+                 json_schema_opts: resolver_opts
+               )
 
       assert resolved["type"] == "array"
     end
@@ -168,7 +178,9 @@ defmodule Elixact.EnhancedValidatorTest do
       schema = Runtime.create_schema([{:response, :string}, {:metadata, :map}])
       data = %{response: "Hello", metadata: %{}}
 
-      assert {:ok, validated, llm_schema} = EnhancedValidator.validate_for_llm(schema, data, :openai)
+      assert {:ok, validated, llm_schema} =
+               EnhancedValidator.validate_for_llm(schema, data, :openai)
+
       assert validated.response == "Hello"
       assert llm_schema["additionalProperties"] == false
     end
@@ -177,7 +189,9 @@ defmodule Elixact.EnhancedValidatorTest do
       type_spec = {:map, {:string, :string}}
       data = %{"key" => "value"}
 
-      assert {:ok, validated, llm_schema} = EnhancedValidator.validate_for_llm(type_spec, data, :anthropic)
+      assert {:ok, validated, llm_schema} =
+               EnhancedValidator.validate_for_llm(type_spec, data, :anthropic)
+
       assert validated == data
       assert llm_schema["additionalProperties"] == false
       assert is_list(llm_schema["required"])
@@ -187,7 +201,9 @@ defmodule Elixact.EnhancedValidatorTest do
       type_spec = :string
       data = "test"
 
-      assert {:ok, validated, llm_schema} = EnhancedValidator.validate_for_llm(type_spec, data, :generic)
+      assert {:ok, validated, llm_schema} =
+               EnhancedValidator.validate_for_llm(type_spec, data, :generic)
+
       assert validated == data
       assert llm_schema["type"] == "string"
     end
@@ -195,7 +211,8 @@ defmodule Elixact.EnhancedValidatorTest do
 
   describe "pipeline/3" do
     test "executes simple validation pipeline" do
-      steps = [:string, :string]  # Simple double validation
+      # Simple double validation
+      steps = [:string, :string]
       input = "hello"
 
       assert {:ok, "hello"} = EnhancedValidator.pipeline(steps, input)
@@ -210,7 +227,8 @@ defmodule Elixact.EnhancedValidatorTest do
     end
 
     test "stops pipeline on validation error" do
-      steps = [:string, :integer]  # String then integer - should fail
+      # String then integer - should fail
+      steps = [:string, :integer]
       input = "hello"
 
       assert {:error, {1, [%Error{code: :type}]}} = EnhancedValidator.pipeline(steps, input)
@@ -226,6 +244,7 @@ defmodule Elixact.EnhancedValidatorTest do
 
     test "complex pipeline with coercion and validation" do
       coercion_config = Config.create(coercion: :safe)
+
       validate_with_coercion = fn value ->
         EnhancedValidator.validate(:integer, value, config: coercion_config)
       end
@@ -256,7 +275,8 @@ defmodule Elixact.EnhancedValidatorTest do
 
     test "reports validation failures in report" do
       schema = Runtime.create_schema([{:name, :string, [min_length: 5]}])
-      data = %{name: "Jo"}  # Too short
+      # Too short
+      data = %{name: "Jo"}
 
       report = EnhancedValidator.validation_report(schema, data)
 
@@ -295,14 +315,16 @@ defmodule Elixact.EnhancedValidatorTest do
 
     test "measures performance accurately" do
       # Use a complex validation that takes measurable time
-      large_schema = Runtime.create_schema([
-        {:items, {:array, {:map, {:string, :integer}}}, [min_items: 100]}
-      ])
+      large_schema =
+        Runtime.create_schema([
+          {:items, {:array, {:map, {:string, :integer}}}, [min_items: 100]}
+        ])
 
       large_data = %{
-        items: for i <- 1..100 do
-          %{"item_#{i}" => i}
-        end
+        items:
+          for i <- 1..100 do
+            %{"item_#{i}" => i}
+          end
       }
 
       report = EnhancedValidator.validation_report(large_schema, large_data)
@@ -327,26 +349,29 @@ defmodule Elixact.EnhancedValidatorTest do
       schema = Runtime.create_schema(fields, title: "Processing Pipeline")
 
       # 2. Configuration
-      config = Config.create(
-        strict: true,
-        extra: :forbid,
-        coercion: :safe,
-        error_format: :detailed
-      )
+      config =
+        Config.create(
+          strict: true,
+          extra: :forbid,
+          coercion: :safe,
+          error_format: :detailed
+        )
 
       # 3. Input data
       input_data = %{
         user_input: "process this data",
-        processed_data: ["1", "2", "3"],  # Strings that need coercion
+        # Strings that need coercion
+        processed_data: ["1", "2", "3"],
         metadata: %{"timestamp" => "2024-01-01", "version" => 1}
       }
 
       # 4. Enhanced validation
-      assert {:ok, validated, json_schema} = EnhancedValidator.validate_with_schema(
-        schema,
-        input_data,
-        config: config
-      )
+      assert {:ok, validated, json_schema} =
+               EnhancedValidator.validate_with_schema(
+                 schema,
+                 input_data,
+                 config: config
+               )
 
       # Should have coerced strings to integers
       assert validated.processed_data == [1, 2, 3]
@@ -357,12 +382,13 @@ defmodule Elixact.EnhancedValidatorTest do
       assert json_schema["additionalProperties"] == false
 
       # 5. Wrapper validation for individual fields
-      assert {:ok, 42} = EnhancedValidator.validate_wrapped(
-        :score,
-        :integer,
-        "42",
-        config: config
-      )
+      assert {:ok, 42} =
+               EnhancedValidator.validate_wrapped(
+                 :score,
+                 :integer,
+                 "42",
+                 config: config
+               )
 
       # 6. Pipeline processing
       processing_steps = [
@@ -378,21 +404,26 @@ defmodule Elixact.EnhancedValidatorTest do
     test "error propagation across all features" do
       # Test that errors are properly propagated and formatted across features
 
-      invalid_schema = Runtime.create_schema([
-        {:name, :string, [min_length: 10]},
-        {:age, :integer, [gt: 0, lt: 150]}
-      ])
+      invalid_schema =
+        Runtime.create_schema([
+          {:name, :string, [min_length: 10]},
+          {:age, :integer, [gt: 0, lt: 150]}
+        ])
 
       invalid_data = %{
-        name: "Jo",      # Too short
-        age: 200,       # Too large
-        extra: "field"  # Extra field in strict mode
+        # Too short
+        name: "Jo",
+        # Too large
+        age: 200,
+        # Extra field in strict mode
+        extra: "field"
       }
 
       strict_config = Config.create(strict: true, extra: :forbid)
 
       # Should get detailed error information
-      assert {:error, errors} = EnhancedValidator.validate(invalid_schema, invalid_data, config: strict_config)
+      assert {:error, errors} =
+               EnhancedValidator.validate(invalid_schema, invalid_data, config: strict_config)
 
       # Errors should be structured and have paths
       case errors do
@@ -401,6 +432,7 @@ defmodule Elixact.EnhancedValidatorTest do
           assert is_list(error.path) or error.path == []
           assert is_atom(error.code)
           assert is_binary(error.message)
+
         error when is_struct(error, Error) ->
           assert is_list(error.path) or error.path == []
           assert is_atom(error.code)
@@ -408,33 +440,40 @@ defmodule Elixact.EnhancedValidatorTest do
       end
 
       # Report should include error details
-      report = EnhancedValidator.validation_report(invalid_schema, invalid_data, config: strict_config)
+      report =
+        EnhancedValidator.validation_report(invalid_schema, invalid_data, config: strict_config)
+
       assert {:error, _} = report[:validation_result]
     end
 
     test "performance across all features" do
       # Test performance when using multiple features together
 
-      {time_us, _result} = :timer.tc(fn ->
-        # Create complex schema
-        fields = for i <- 1..50 do
-          {String.to_atom("field_#{i}"), {:array, :string}, [min_items: 1, max_items: 10]}
-        end
+      {time_us, _result} =
+        :timer.tc(fn ->
+          # Create complex schema
+          fields =
+            for i <- 1..50 do
+              {String.to_atom("field_#{i}"), {:array, :string}, [min_items: 1, max_items: 10]}
+            end
 
-        schema = Runtime.create_schema(fields)
+          schema = Runtime.create_schema(fields)
 
-        # Generate test data
-        data = for i <- 1..50 do
-          {String.to_atom("field_#{i}"), ["item1", "item2", "item3"]}
-        end |> Map.new()
+          # Generate test data
+          data =
+            for i <- 1..50 do
+              {String.to_atom("field_#{i}"), ["item1", "item2", "item3"]}
+            end
+            |> Map.new()
 
-        # Validate with enhanced validator
-        config = Config.create(strict: true)
-        EnhancedValidator.validate_with_resolved_schema(schema, data, config: config)
-      end)
+          # Validate with enhanced validator
+          config = Config.create(strict: true)
+          EnhancedValidator.validate_with_resolved_schema(schema, data, config: config)
+        end)
 
       # Should complete complex validation in reasonable time
-      assert time_us < 100_000  # 100ms
+      # 100ms
+      assert time_us < 100_000
     end
   end
 
@@ -459,7 +498,8 @@ defmodule Elixact.EnhancedValidatorTest do
 
       for input <- malformed_inputs do
         case EnhancedValidator.validate(schema, input) do
-          {:error, _} -> assert true  # Expected error
+          # Expected error
+          {:error, _} -> assert true
           {:ok, _} -> assert false, "Should have failed for input: #{inspect(input)}"
         end
       end
@@ -469,14 +509,15 @@ defmodule Elixact.EnhancedValidatorTest do
       schema = Runtime.create_schema([{:id, :integer}, {:name, :string}])
 
       # Run multiple validations concurrently
-      tasks = for i <- 1..20 do
-        Task.async(fn ->
-          data = %{id: i, name: "user_#{i}"}
-          EnhancedValidator.validate(schema, data)
-        end)
-      end
+      tasks =
+        for i <- 1..20 do
+          Task.async(fn ->
+            data = %{id: i, name: "user_#{i}"}
+            EnhancedValidator.validate(schema, data)
+          end)
+        end
 
-      results = Task.await_all(tasks)
+      results = Task.await_many(tasks)
 
       # All should succeed
       assert Enum.all?(results, &match?({:ok, _}, &1))
@@ -484,14 +525,16 @@ defmodule Elixact.EnhancedValidatorTest do
 
     test "handles memory efficiently with large validations" do
       # Create large dataset
-      large_schema = Runtime.create_schema([
-        {:items, {:array, {:map, {:string, :integer}}}, []}
-      ])
+      large_schema =
+        Runtime.create_schema([
+          {:items, {:array, {:map, {:string, :integer}}}, []}
+        ])
 
       large_data = %{
-        items: for i <- 1..1000 do
-          %{"id" => i, "value" => i * 2}
-        end
+        items:
+          for i <- 1..1000 do
+            %{"id" => i, "value" => i * 2}
+          end
       }
 
       # Should handle large data without memory issues
@@ -500,16 +543,18 @@ defmodule Elixact.EnhancedValidatorTest do
     end
 
     test "handles deeply nested validation errors" do
-      nested_schema = Runtime.create_schema([
-        {:level1, {:map, {:string, {:array, {:map, {:string, :integer}}}}}, []}
-      ])
+      nested_schema =
+        Runtime.create_schema([
+          {:level1, {:map, {:string, {:array, {:map, {:string, :integer}}}}}, []}
+        ])
 
       # Data with error deep in nesting
       nested_data = %{
         level1: %{
           "key1" => [
             %{"valid" => 1},
-            %{"invalid" => "not_a_number"}  # Error here
+            # Error here
+            %{"invalid" => "not_a_number"}
           ]
         }
       }
@@ -523,6 +568,7 @@ defmodule Elixact.EnhancedValidatorTest do
             [first_error | _] -> assert length(first_error.path) > 2
             single_error -> assert length(single_error.path) > 2
           end
+
         {:ok, _} ->
           # Some validators might be more lenient
           assert true
@@ -531,18 +577,22 @@ defmodule Elixact.EnhancedValidatorTest do
 
     test "validates with custom error messages" do
       # Test that custom error messages work through enhanced validator
-      type_spec = {:type, :string, [
-        min_length: 5,
-        {:error_message, :min_length, "String must be at least 5 characters"}
-      ]}
+      type_spec =
+        {:type, :string,
+         [
+           {:error_message, :min_length, "String must be at least 5 characters"},
+           min_length: 5
+         ]}
 
       result = EnhancedValidator.validate(type_spec, "hi")
 
       case result do
         {:error, [error]} ->
           assert error.message == "String must be at least 5 characters"
+
         {:error, error} ->
           assert error.message == "String must be at least 5 characters"
+
         _ ->
           # If error format is different, that's also acceptable
           assert true
@@ -552,12 +602,13 @@ defmodule Elixact.EnhancedValidatorTest do
 
   describe "advanced configuration integration" do
     test "config builder integration" do
-      config = Config.builder()
-      |> Config.Builder.strict(true)
-      |> Config.Builder.forbid_extra()
-      |> Config.Builder.safe_coercion()
-      |> Config.Builder.detailed_errors()
-      |> Config.Builder.build()
+      config =
+        Config.builder()
+        |> Config.Builder.strict(true)
+        |> Config.Builder.forbid_extra()
+        |> Config.Builder.safe_coercion()
+        |> Config.Builder.detailed_errors()
+        |> Config.Builder.build()
 
       schema = Runtime.create_schema([{:name, :string}])
       data = %{name: "John", extra: "not allowed"}
@@ -580,7 +631,8 @@ defmodule Elixact.EnhancedValidatorTest do
           {:lenient, {:ok, _}} -> assert true
           {:api, {:error, _}} -> assert true
           {:development, {:ok, _}} -> assert true
-          _ -> assert true  # Other combinations are also valid
+          # Other combinations are also valid
+          _ -> assert true
         end
       end
     end

@@ -190,13 +190,15 @@ defmodule Elixact.ConfigTest do
     test "detects conflict between strict mode and extra allow" do
       config = Config.create(strict: true, extra: :allow)
 
-      assert {:error, ["strict mode conflicts with extra: :allow"]} = Config.validate_config(config)
+      assert {:error, ["strict mode conflicts with extra: :allow"]} =
+               Config.validate_config(config)
     end
 
     test "detects conflict between aggressive coercion and validate assignment" do
       config = Config.create(coercion: :aggressive, validate_assignment: true)
 
-      assert {:error, ["aggressive coercion conflicts with validate_assignment"]} = Config.validate_config(config)
+      assert {:error, ["aggressive coercion conflicts with validate_assignment"]} =
+               Config.validate_config(config)
     end
 
     test "validates max_anyof_union_len constraint" do
@@ -206,13 +208,14 @@ defmodule Elixact.ConfigTest do
     end
 
     test "reports multiple validation errors" do
-      config = Config.create(
-        strict: true,
-        extra: :allow,
-        coercion: :aggressive,
-        validate_assignment: true,
-        max_anyof_union_len: 0
-      )
+      config =
+        Config.create(
+          strict: true,
+          extra: :allow,
+          coercion: :aggressive,
+          validate_assignment: true,
+          max_anyof_union_len: 0
+        )
 
       assert {:error, errors} = Config.validate_config(config)
       assert length(errors) == 3
@@ -224,14 +227,15 @@ defmodule Elixact.ConfigTest do
 
   describe "conversion functions" do
     test "to_validation_opts converts config to validation options" do
-      config = Config.create(
-        strict: true,
-        coercion: :safe,
-        extra: :forbid,
-        validate_assignment: true,
-        case_sensitive: false,
-        error_format: :simple
-      )
+      config =
+        Config.create(
+          strict: true,
+          coercion: :safe,
+          extra: :forbid,
+          validate_assignment: true,
+          case_sensitive: false,
+          error_format: :simple
+        )
 
       opts = Config.to_validation_opts(config)
 
@@ -253,11 +257,12 @@ defmodule Elixact.ConfigTest do
     end
 
     test "to_json_schema_opts converts config to JSON schema options" do
-      config = Config.create(
-        strict: true,
-        use_enum_values: true,
-        max_anyof_union_len: 3
-      )
+      config =
+        Config.create(
+          strict: true,
+          use_enum_values: true,
+          max_anyof_union_len: 3
+        )
 
       opts = Config.to_json_schema_opts(config)
 
@@ -270,10 +275,11 @@ defmodule Elixact.ConfigTest do
       title_gen = fn field -> field |> Atom.to_string() |> String.capitalize() end
       desc_gen = fn field -> "Field for #{field}" end
 
-      config = Config.create(
-        title_generator: title_gen,
-        description_generator: desc_gen
-      )
+      config =
+        Config.create(
+          title_generator: title_gen,
+          description_generator: desc_gen
+        )
 
       opts = Config.to_json_schema_opts(config)
 
@@ -302,15 +308,16 @@ defmodule Elixact.ConfigTest do
     end
 
     test "summary provides configuration overview" do
-      config = Config.create(
-        strict: true,
-        extra: :forbid,
-        coercion: :safe,
-        frozen: true,
-        error_format: :simple,
-        validate_assignment: true,
-        use_enum_values: true
-      )
+      config =
+        Config.create(
+          strict: true,
+          extra: :forbid,
+          coercion: :safe,
+          frozen: true,
+          error_format: :simple,
+          validate_assignment: true,
+          use_enum_values: true
+        )
 
       summary = Config.summary(config)
 
@@ -348,13 +355,14 @@ defmodule Elixact.ConfigTest do
     end
 
     test "builder can be used to create complex configurations" do
-      config = Config.builder()
-      |> Config.Builder.strict(true)
-      |> Config.Builder.forbid_extra()
-      |> Config.Builder.safe_coercion()
-      |> Config.Builder.detailed_errors()
-      |> Config.Builder.frozen(true)
-      |> Config.Builder.build()
+      config =
+        Config.builder()
+        |> Config.Builder.strict(true)
+        |> Config.Builder.forbid_extra()
+        |> Config.Builder.safe_coercion()
+        |> Config.Builder.detailed_errors()
+        |> Config.Builder.frozen(true)
+        |> Config.Builder.build()
 
       assert config.strict == true
       assert config.extra == :forbid
@@ -381,16 +389,27 @@ defmodule Elixact.ConfigTest do
     end
 
     test "configuration inheritance and customization" do
-      base_config = Config.preset(:api)
-      custom_config = Config.merge(base_config, %{
-        error_format: :minimal,
-        case_sensitive: false
-      })
+      # Use a non-frozen base config for inheritance testing
+      base_config =
+        Config.create(%{
+          strict: true,
+          extra: :forbid,
+          coercion: :safe,
+          validate_assignment: true,
+          case_sensitive: true,
+          error_format: :detailed
+        })
 
-      # Should inherit from API preset
+      custom_config =
+        Config.merge(base_config, %{
+          error_format: :minimal,
+          case_sensitive: false
+        })
+
+      # Should inherit from base config
       assert custom_config.strict == true
       assert custom_config.extra == :forbid
-      assert custom_config.frozen == true
+      assert custom_config.frozen == false
 
       # Should apply customizations
       assert custom_config.error_format == :minimal
@@ -408,10 +427,11 @@ defmodule Elixact.ConfigTest do
 
       desc_fn = fn field -> "Generated description for #{field}" end
 
-      config = Config.create(
-        title_generator: title_fn,
-        description_generator: desc_fn
-      )
+      config =
+        Config.create(
+          title_generator: title_fn,
+          description_generator: desc_fn
+        )
 
       assert is_function(config.title_generator, 1)
       assert is_function(config.description_generator, 1)
@@ -479,12 +499,13 @@ defmodule Elixact.ConfigTest do
     end
 
     test "config serialization and deserialization" do
-      original_config = Config.create(
-        strict: true,
-        extra: :forbid,
-        coercion: :safe,
-        frozen: false
-      )
+      original_config =
+        Config.create(
+          strict: true,
+          extra: :forbid,
+          coercion: :safe,
+          frozen: false
+        )
 
       # Should be able to convert to map and back
       config_map = Map.from_struct(original_config)

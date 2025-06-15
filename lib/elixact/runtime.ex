@@ -1,7 +1,7 @@
 defmodule Elixact.Runtime do
   @moduledoc """
   Runtime schema generation and validation capabilities.
-  
+
   This module enables dynamic schema creation from field definitions at runtime,
   supporting the DSPy pattern of `pydantic.create_model("DSPyProgramOutputs", **fields)`.
   """
@@ -41,14 +41,14 @@ defmodule Elixact.Runtime do
   @spec create_schema([field_definition()], [schema_option()]) :: DynamicSchema.t()
   def create_schema(field_definitions, opts \\ []) do
     name = Keyword.get(opts, :name, generate_schema_name())
-    
+
     config = %{
       title: Keyword.get(opts, :title),
       description: Keyword.get(opts, :description),
       strict: Keyword.get(opts, :strict, false)
     }
 
-    fields = 
+    fields =
       field_definitions
       |> Enum.map(&normalize_field_definition/1)
       |> Map.new(fn {name, meta} -> {name, meta} end)
@@ -82,15 +82,24 @@ defmodule Elixact.Runtime do
       iex> Elixact.Runtime.validate(data, schema)
       {:ok, %{name: "John", age: 30}}
   """
-  @spec validate(map(), DynamicSchema.t(), keyword()) :: 
-    {:ok, map()} | {:error, [Elixact.Error.t()]}
+  @spec validate(map(), DynamicSchema.t(), keyword()) ::
+          {:ok, map()} | {:error, [Elixact.Error.t()]}
   def validate(data, %DynamicSchema{} = schema, opts \\ []) do
     path = Keyword.get(opts, :path, [])
-    
+
     with :ok <- validate_required_fields(schema.fields, data, path),
          {:ok, validated} <- validate_fields(schema.fields, data, path),
          :ok <- validate_strict_mode(schema.config, validated, data, path) do
       {:ok, validated}
+    else
+      {:error, errors} when is_list(errors) ->
+        {:error, errors}
+
+      {:error, error} when is_struct(error, Elixact.Error) ->
+        {:error, [error]}
+
+      {:error, other} ->
+        {:error, [other]}
     end
   end
 
@@ -110,33 +119,38 @@ defmodule Elixact.Runtime do
       %{"type" => "object", "properties" => %{...}}
   """
   @spec to_json_schema(DynamicSchema.t(), keyword()) :: map()
-  def to_json_schema(%DynamicSchema{} = schema, _opts \\ []) do
+  def to_json_schema(%DynamicSchema{} = schema, opts \\ []) do
     {:ok, store} = Elixact.JsonSchema.ReferenceStore.start_link()
 
     try do
-      base_schema = %{
-        "type" => "object",
-        "title" => schema.config[:title],
-        "description" => schema.config[:description],
-        "properties" => %{},
-        "required" => []
-      }
-      |> maybe_add_additional_properties(schema.config[:strict])
-      |> Map.reject(fn {_, v} -> is_nil(v) end)
+      base_schema =
+        %{
+          "type" => "object",
+          "title" => schema.config[:title],
+          "description" => schema.config[:description],
+          "properties" => %{},
+          "required" => []
+        }
+        |> maybe_add_additional_properties(
+          schema.config[:strict] ||
+            Keyword.get(opts, :additional_properties) == false ||
+            Keyword.get(opts, :strict, false)
+        )
+        |> Map.reject(fn {_, v} -> is_nil(v) end)
 
-      schema_with_fields = 
+      schema_with_fields =
         Enum.reduce(schema.fields, base_schema, fn {name, field_meta}, acc ->
           # Add to properties
           properties = Map.get(acc, "properties", %{})
-          
-          field_schema = 
+
+          field_schema =
             Elixact.JsonSchema.TypeMapper.to_json_schema(field_meta.type, store)
             |> Map.merge(convert_field_metadata(field_meta))
             |> Map.reject(fn {_, v} -> is_nil(v) end)
-          
+
           updated_properties = Map.put(properties, Atom.to_string(name), field_schema)
           acc = Map.put(acc, "properties", updated_properties)
-          
+
           # Add to required if needed
           if field_meta.required do
             required = Map.get(acc, "required", [])
@@ -148,7 +162,7 @@ defmodule Elixact.Runtime do
 
       # Add definitions if any references were created
       definitions = Elixact.JsonSchema.ReferenceStore.get_definitions(store)
-      
+
       if map_size(definitions) > 0 do
         Map.put(schema_with_fields, "definitions", definitions)
       else
@@ -170,7 +184,7 @@ defmodule Elixact.Runtime do
     field_meta = %FieldMeta{
       name: name,
       type: normalize_type_definition(type, opts),
-      required: Keyword.get(opts, :required, true),
+      required: determine_required(opts),
       description: Keyword.get(opts, :description),
       example: Keyword.get(opts, :example),
       examples: Keyword.get(opts, :examples),
@@ -179,7 +193,7 @@ defmodule Elixact.Runtime do
     }
 
     # If default is provided, make field optional
-    field_meta = 
+    field_meta =
       if field_meta.default do
         %{field_meta | required: false}
       else
@@ -192,14 +206,14 @@ defmodule Elixact.Runtime do
   @spec normalize_type_definition(type_spec(), keyword()) :: Elixact.Types.type_definition()
   defp normalize_type_definition(type, opts) when is_atom(type) do
     constraints = extract_constraints(opts)
-    
+
     cond do
       type in [:string, :integer, :float, :boolean, :any, :atom, :map] ->
         {:type, type, constraints}
-      
+
       Code.ensure_loaded?(type) and function_exported?(type, :__schema__, 1) ->
         {:ref, type}
-      
+
       true ->
         {:type, type, constraints}
     end
@@ -228,24 +242,39 @@ defmodule Elixact.Runtime do
     {Elixact.Types.normalize_type(type), constraints}
   end
 
+  @spec determine_required(keyword()) :: boolean()
+  defp determine_required(opts) do
+    cond do
+      Keyword.has_key?(opts, :required) -> Keyword.get(opts, :required)
+      Keyword.get(opts, :optional, false) -> false
+      true -> true
+    end
+  end
+
   @spec extract_constraints(keyword()) :: [term()]
   defp extract_constraints(opts) do
-    constraint_keys = [
-      :min_length, :max_length, :min_items, :max_items,
-      :gt, :lt, :gteq, :lteq, :format, :choices
-    ]
-    
-    Enum.flat_map(constraint_keys, fn key ->
-      case Keyword.get(opts, key) do
-        nil -> []
-        value -> [{key, value}]
-      end
+    constraint_keys =
+      MapSet.new([
+        :min_length,
+        :max_length,
+        :min_items,
+        :max_items,
+        :gt,
+        :lt,
+        :gteq,
+        :lteq,
+        :format,
+        :choices
+      ])
+
+    Enum.filter(opts, fn {key, _value} ->
+      MapSet.member?(constraint_keys, key)
     end)
   end
 
   @spec validate_required_fields(map(), map(), [atom()]) :: :ok | {:error, Elixact.Error.t()}
   defp validate_required_fields(fields, data, path) do
-    required_fields = 
+    required_fields =
       fields
       |> Enum.filter(fn {_, meta} -> meta.required end)
       |> Enum.map(fn {name, _} -> name end)
@@ -258,7 +287,8 @@ defmodule Elixact.Runtime do
     end
   end
 
-  @spec validate_fields(map(), map(), [atom()]) :: {:ok, map()} | {:error, Elixact.Error.t()}
+  @spec validate_fields(map(), map(), [atom()]) ::
+          {:ok, map()} | {:error, Elixact.Error.t() | [Elixact.Error.t()]}
   defp validate_fields(fields, data, path) do
     Enum.reduce_while(fields, {:ok, %{}}, fn {name, meta}, {:ok, acc} ->
       field_path = path ++ [name]
@@ -287,10 +317,14 @@ defmodule Elixact.Runtime do
   defp validate_strict_mode(%{strict: true}, validated, original, path) do
     validated_keys = Map.keys(validated) |> Enum.map(&Atom.to_string/1) |> MapSet.new()
     original_keys = Map.keys(original) |> Enum.map(&to_string/1) |> MapSet.new()
-    
+
     case MapSet.difference(original_keys, validated_keys) |> MapSet.to_list() do
-      [] -> :ok
-      extra -> {:error, Elixact.Error.new(path, :additional_properties, "unknown fields: #{inspect(extra)}")}
+      [] ->
+        :ok
+
+      extra ->
+        {:error,
+         Elixact.Error.new(path, :additional_properties, "unknown fields: #{inspect(extra)}")}
     end
   end
 
@@ -311,14 +345,14 @@ defmodule Elixact.Runtime do
     }
 
     # Handle examples
-    base = 
+    base =
       cond do
         examples = field_meta.examples ->
           Map.put(base, "examples", examples)
-        
+
         example = field_meta.example ->
           Map.put(base, "examples", [example])
-        
+
         true ->
           base
       end

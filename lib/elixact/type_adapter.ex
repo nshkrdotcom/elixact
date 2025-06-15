@@ -1,11 +1,11 @@
 defmodule Elixact.TypeAdapter do
   @moduledoc """
   Runtime type validation and serialization without a schema.
-  
+
   This module provides the equivalent of Pydantic's TypeAdapter functionality,
   allowing validation and serialization of values against type specifications
   without requiring a full schema definition.
-  
+
   Supports the DSPy pattern: `TypeAdapter(type(value)).validate_python(value)`
   """
 
@@ -13,14 +13,14 @@ defmodule Elixact.TypeAdapter do
 
   @type type_spec :: Types.type_definition() | atom() | module() | term()
   @type validation_options :: [
-    coerce: boolean(),
-    strict: boolean(),
-    path: [atom() | String.t()]
-  ]
+          coerce: boolean(),
+          strict: boolean(),
+          path: [atom() | String.t()]
+        ]
   @type dump_options :: [
-    exclude_none: boolean(),
-    exclude_defaults: boolean()
-  ]
+          exclude_none: boolean(),
+          exclude_defaults: boolean()
+        ]
 
   @doc """
   Validates a value against a type specification.
@@ -53,30 +53,39 @@ defmodule Elixact.TypeAdapter do
       iex> Elixact.TypeAdapter.validate(:integer, "not a number")
       {:error, [%Elixact.Error{...}]}
   """
-  @spec validate(type_spec(), term(), validation_options()) :: 
-    {:ok, term()} | {:error, [Elixact.Error.t()]}
+  @spec validate(type_spec(), term(), validation_options()) ::
+          {:ok, term()} | {:error, [Elixact.Error.t()]}
   def validate(type_spec, value, opts \\ []) do
     path = Keyword.get(opts, :path, [])
     coerce = Keyword.get(opts, :coerce, false)
-    
+
     normalized_type = normalize_type_spec(type_spec)
-    
+
     # Apply coercion if enabled
-    value_to_validate = 
+    value_to_validate =
       if coerce do
         case attempt_coercion(normalized_type, value) do
           {:ok, coerced} -> coerced
-          {:error, _} -> value  # Fall back to original value
+          # Fall back to original value
+          {:error, _} -> value
         end
       else
         value
       end
-    
-    case Validator.validate(normalized_type, value_to_validate, path) do
-      {:ok, validated} -> {:ok, validated}
-      {:error, error} when is_struct(error, Elixact.Error) -> {:error, [error]}
-      {:error, errors} when is_list(errors) -> {:error, errors}
-      {:error, error} -> {:error, [error]}
+
+    try do
+      case Validator.validate(normalized_type, value_to_validate, path) do
+        {:ok, validated} -> {:ok, validated}
+        {:error, error} when is_struct(error, Elixact.Error) -> {:error, [error]}
+        {:error, errors} when is_list(errors) -> {:error, errors}
+        {:error, error} -> {:error, [error]}
+      end
+    rescue
+      FunctionClauseError ->
+        raise ArgumentError, "Invalid type specification: #{inspect(type_spec)}"
+
+      MatchError ->
+        raise ArgumentError, "Invalid type specification: #{inspect(type_spec)}"
     end
   end
 
@@ -108,9 +117,9 @@ defmodule Elixact.TypeAdapter do
   def dump(type_spec, value, opts \\ []) do
     exclude_none = Keyword.get(opts, :exclude_none, false)
     exclude_defaults = Keyword.get(opts, :exclude_defaults, false)
-    
+
     normalized_type = normalize_type_spec(type_spec)
-    
+
     case serialize_value(normalized_type, value, exclude_none, exclude_defaults) do
       {:ok, serialized} -> {:ok, serialized}
       {:error, reason} -> {:error, reason}
@@ -146,28 +155,28 @@ defmodule Elixact.TypeAdapter do
   @spec json_schema(type_spec(), keyword()) :: map()
   def json_schema(type_spec, opts \\ []) do
     normalized_type = normalize_type_spec(type_spec)
-    
+
     {:ok, store} = JsonSchema.ReferenceStore.start_link()
-    
+
     try do
       base_schema = JsonSchema.TypeMapper.to_json_schema(normalized_type, store)
-      
+
       # Add optional metadata
-      schema_with_metadata = 
+      schema_with_metadata =
         base_schema
         |> maybe_add_title(Keyword.get(opts, :title))
         |> maybe_add_description(Keyword.get(opts, :description))
-      
+
       # Add definitions if any references were created
       definitions = JsonSchema.ReferenceStore.get_definitions(store)
-      
-      final_schema = 
+
+      final_schema =
         if map_size(definitions) > 0 do
           Map.put(schema_with_metadata, "definitions", definitions)
         else
           schema_with_metadata
         end
-      
+
       # Resolve references if requested
       if Keyword.get(opts, :resolve_refs, false) do
         Elixact.JsonSchema.Resolver.resolve_references(final_schema)
@@ -215,16 +224,16 @@ defmodule Elixact.TypeAdapter do
   end
 
   defp attempt_coercion({:array, inner_type, _}, value) when is_list(value) do
-    results = 
+    results =
       Enum.map(value, fn item ->
         attempt_coercion(inner_type, item)
       end)
-    
+
     case Enum.split_with(results, &match?({:ok, _}, &1)) do
-      {oks, []} -> 
+      {oks, []} ->
         coerced_values = Enum.map(oks, fn {:ok, val} -> val end)
         {:ok, coerced_values}
-      
+
       {_, errors} ->
         first_error = hd(errors)
         {:error, "array coercion failed: #{elem(first_error, 1)}"}
@@ -232,7 +241,7 @@ defmodule Elixact.TypeAdapter do
   end
 
   defp attempt_coercion({:map, {key_type, value_type}, _}, value) when is_map(value) do
-    results = 
+    results =
       Enum.map(value, fn {k, v} ->
         with {:ok, coerced_key} <- attempt_coercion(key_type, k),
              {:ok, coerced_value} <- attempt_coercion(value_type, v) do
@@ -241,12 +250,12 @@ defmodule Elixact.TypeAdapter do
           error -> error
         end
       end)
-    
+
     case Enum.split_with(results, &match?({:ok, _}, &1)) do
       {oks, []} ->
         coerced_map = Map.new(Enum.map(oks, fn {:ok, kv} -> kv end))
         {:ok, coerced_map}
-      
+
       {_, errors} ->
         first_error = hd(errors)
         {:error, "map coercion failed: #{elem(first_error, 1)}"}
@@ -264,11 +273,12 @@ defmodule Elixact.TypeAdapter do
   end
 
   defp attempt_coercion(_, value) do
-    {:ok, value}  # No coercion needed/possible
+    # No coercion needed/possible
+    {:ok, value}
   end
 
-  @spec serialize_value(Types.type_definition(), term(), boolean(), boolean()) :: 
-    {:ok, term()} | {:error, String.t()}
+  @spec serialize_value(Types.type_definition(), term(), boolean(), boolean()) ::
+          {:ok, term()} | {:error, String.t()}
   defp serialize_value({:type, :string, _}, value, _, _) when is_binary(value) do
     {:ok, value}
   end
@@ -293,53 +303,59 @@ defmodule Elixact.TypeAdapter do
     {:ok, value}
   end
 
-  defp serialize_value({:array, inner_type, _}, value, exclude_none, exclude_defaults) when is_list(value) do
-    results = 
+  defp serialize_value({:array, inner_type, _}, value, exclude_none, exclude_defaults)
+       when is_list(value) do
+    results =
       Enum.map(value, fn item ->
         serialize_value(inner_type, item, exclude_none, exclude_defaults)
       end)
-    
+
     case Enum.split_with(results, &match?({:ok, _}, &1)) do
       {oks, []} ->
         serialized_items = Enum.map(oks, fn {:ok, val} -> val end)
-        filtered_items = 
+
+        filtered_items =
           if exclude_none do
             Enum.reject(serialized_items, &is_nil/1)
           else
             serialized_items
           end
+
         {:ok, filtered_items}
-      
+
       {_, errors} ->
         first_error = hd(errors)
         {:error, "array serialization failed: #{elem(first_error, 1)}"}
     end
   end
 
-  defp serialize_value({:map, {key_type, value_type}, _}, value, exclude_none, exclude_defaults) when is_map(value) do
-    results = 
+  defp serialize_value({:map, {key_type, value_type}, _}, value, exclude_none, exclude_defaults)
+       when is_map(value) do
+    results =
       Enum.map(value, fn {k, v} ->
-        with {:ok, serialized_key} <- serialize_value(key_type, k, exclude_none, exclude_defaults),
-             {:ok, serialized_value} <- serialize_value(value_type, v, exclude_none, exclude_defaults) do
+        with {:ok, serialized_key} <-
+               serialize_value(key_type, k, exclude_none, exclude_defaults),
+             {:ok, serialized_value} <-
+               serialize_value(value_type, v, exclude_none, exclude_defaults) do
           {:ok, {serialized_key, serialized_value}}
         else
           error -> error
         end
       end)
-    
+
     case Enum.split_with(results, &match?({:ok, _}, &1)) do
       {oks, []} ->
         serialized_map = Map.new(Enum.map(oks, fn {:ok, kv} -> kv end))
-        
-        filtered_map = 
+
+        filtered_map =
           if exclude_none do
             Map.reject(serialized_map, fn {_, v} -> is_nil(v) end)
           else
             serialized_map
           end
-        
+
         {:ok, filtered_map}
-      
+
       {_, errors} ->
         first_error = hd(errors)
         {:error, "map serialization failed: #{elem(first_error, 1)}"}
@@ -356,16 +372,21 @@ defmodule Elixact.TypeAdapter do
     end)
   end
 
-  defp serialize_value({:ref, schema}, value, exclude_none, exclude_defaults) when is_atom(schema) do
+  defp serialize_value({:ref, schema}, value, exclude_none, exclude_defaults)
+       when is_atom(schema) do
     # For schema references, validate and then serialize as map
     case validate(schema, value) do
-      {:ok, validated} -> serialize_value({:type, :map, []}, validated, exclude_none, exclude_defaults)
-      {:error, _} = error -> error
+      {:ok, validated} ->
+        serialize_value({:type, :map, []}, validated, exclude_none, exclude_defaults)
+
+      {:error, _} = error ->
+        error
     end
   end
 
   defp serialize_value(_, value, _, _) do
-    {:ok, value}  # Default: return value as-is
+    # Default: return value as-is
+    {:ok, value}
   end
 
   @spec maybe_add_title(map(), String.t() | nil) :: map()

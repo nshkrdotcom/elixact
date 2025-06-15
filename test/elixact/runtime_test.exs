@@ -31,8 +31,12 @@ defmodule Elixact.RuntimeTest do
       schema = Runtime.create_schema(fields)
 
       assert schema.fields[:tags].type == {:array, {:type, :string, []}, [min_items: 1]}
-      assert schema.fields[:metadata].type == {:map, {{:type, :string, []}, {:type, :any, []}}, []}
-      assert schema.fields[:choice].type == {:union, [{:type, :string, []}, {:type, :integer, []}], []}
+
+      assert schema.fields[:metadata].type ==
+               {:map, {{:type, :string, []}, {:type, :any, []}}, []}
+
+      assert schema.fields[:choice].type ==
+               {:union, [{:type, :string, []}, {:type, :integer, []}], []}
     end
 
     test "creates schema with constraints and validations" do
@@ -99,7 +103,8 @@ defmodule Elixact.RuntimeTest do
       assert validated.name == "John Doe"
       assert validated.age == 30
       assert validated.email == "john@example.com"
-      assert validated.active == true  # default value
+      # default value
+      assert validated.active == true
     end
 
     test "validates with string keys", %{schema: schema} do
@@ -114,29 +119,32 @@ defmodule Elixact.RuntimeTest do
     end
 
     test "fails validation with missing required fields", %{schema: schema} do
-      data = %{name: "John"}  # missing required email
+      # missing required email
+      data = %{name: "John"}
 
-      assert {:error, error} = Runtime.validate(data, schema)
+      assert {:error, [error]} = Runtime.validate(data, schema)
       assert %Error{code: :required} = error
     end
 
     test "fails validation with invalid field values", %{schema: schema} do
       data = %{
-        name: "J",  # too short
+        # too short
+        name: "J",
         email: "john@example.com"
       }
 
-      assert {:error, error} = Runtime.validate(data, schema)
+      assert {:error, [error]} = Runtime.validate(data, schema)
       assert %Error{code: :min_length} = error
     end
 
     test "preserves field paths in error messages", %{schema: schema} do
       data = %{
         name: "John",
-        email: "invalid-email",  # no @ symbol
+        # no @ symbol
+        email: "invalid-email"
       }
 
-      assert {:error, error} = Runtime.validate(data, schema)
+      assert {:error, [error]} = Runtime.validate(data, schema)
       assert error.path == [:email]
       assert error.code == :format
     end
@@ -147,7 +155,7 @@ defmodule Elixact.RuntimeTest do
 
       data = %{name: "John", extra_field: "not allowed"}
 
-      assert {:error, error} = Runtime.validate(data, schema)
+      assert {:error, [error]} = Runtime.validate(data, schema)
       assert error.code == :additional_properties
     end
 

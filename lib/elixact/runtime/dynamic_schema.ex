@@ -1,7 +1,7 @@
 defmodule Elixact.Runtime.DynamicSchema do
   @moduledoc """
   Represents a schema created at runtime with field definitions and configuration.
-  
+
   This struct holds all the information needed to validate data against a 
   dynamically created schema, including field metadata, configuration options,
   and runtime metadata.
@@ -9,10 +9,14 @@ defmodule Elixact.Runtime.DynamicSchema do
 
   @enforce_keys [:name, :fields, :config]
   defstruct [
-    :name,           # String - Unique identifier for the schema
-    :fields,         # Map - Field name -> FieldMeta mapping  
-    :config,         # Map - Schema configuration options
-    :metadata        # Map - Runtime metadata (creation time, etc.)
+    # String - Unique identifier for the schema
+    :name,
+    # Map - Field name -> FieldMeta mapping  
+    :fields,
+    # Map - Schema configuration options
+    :config,
+    # Map - Runtime metadata (creation time, etc.)
+    :metadata
   ]
 
   @type t :: %__MODULE__{
@@ -48,10 +52,14 @@ defmodule Elixact.Runtime.DynamicSchema do
       name: name,
       fields: fields,
       config: config,
-      metadata: Map.merge(%{
-        created_at: DateTime.utc_now(),
-        field_count: map_size(fields)
-      }, metadata)
+      metadata:
+        Map.merge(
+          %{
+            created_at: DateTime.utc_now(),
+            field_count: map_size(fields)
+          },
+          metadata
+        )
     }
   end
 
@@ -203,11 +211,8 @@ defmodule Elixact.Runtime.DynamicSchema do
   def add_field(%__MODULE__{} = schema, field_name, field_meta) do
     updated_fields = Map.put(schema.fields, field_name, field_meta)
     updated_metadata = Map.put(schema.metadata, :field_count, map_size(updated_fields))
-    
-    %{schema | 
-      fields: updated_fields,
-      metadata: updated_metadata
-    }
+
+    %{schema | fields: updated_fields, metadata: updated_metadata}
   end
 
   @doc """
@@ -229,11 +234,8 @@ defmodule Elixact.Runtime.DynamicSchema do
   def remove_field(%__MODULE__{} = schema, field_name) do
     updated_fields = Map.delete(schema.fields, field_name)
     updated_metadata = Map.put(schema.metadata, :field_count, map_size(updated_fields))
-    
-    %{schema | 
-      fields: updated_fields,
-      metadata: updated_metadata
-    }
+
+    %{schema | fields: updated_fields, metadata: updated_metadata}
   end
 
   @doc """
@@ -260,7 +262,7 @@ defmodule Elixact.Runtime.DynamicSchema do
   def summary(%__MODULE__{} = schema) do
     required = required_fields(schema)
     optional = optional_fields(schema)
-    
+
     %{
       name: schema.name,
       field_count: length(required) + length(optional),

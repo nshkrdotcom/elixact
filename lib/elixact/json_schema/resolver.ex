@@ -9,10 +9,10 @@ defmodule Elixact.JsonSchema.Resolver do
 
   @type schema :: map()
   @type resolution_options :: [
-    max_depth: non_neg_integer(),
-    preserve_titles: boolean(),
-    preserve_descriptions: boolean()
-  ]
+          max_depth: non_neg_integer(),
+          preserve_titles: boolean(),
+          preserve_descriptions: boolean()
+        ]
 
   @doc """
   Recursively resolves all $ref entries in a schema.
@@ -207,7 +207,8 @@ defmodule Elixact.JsonSchema.Resolver do
 
   @spec resolve_schema_part(schema(), map(), non_neg_integer()) :: schema()
   defp resolve_schema_part(schema, context, depth) when depth > context.max_depth do
-    schema  # Prevent infinite recursion
+    # Prevent infinite recursion
+    schema
   end
 
   defp resolve_schema_part(%{"$ref" => ref} = schema, context, depth) do
@@ -218,11 +219,16 @@ defmodule Elixact.JsonSchema.Resolver do
         merge_schema_properties(resolved, additional_props, context)
 
       {:error, _} ->
-        schema  # Keep original if resolution fails
+        # Keep original if resolution fails
+        schema
     end
   end
 
-  defp resolve_schema_part(%{"type" => "object", "properties" => properties} = schema, context, depth) do
+  defp resolve_schema_part(
+         %{"type" => "object", "properties" => properties} = schema,
+         context,
+         depth
+       ) do
     resolved_properties =
       properties
       |> Enum.map(fn {key, prop_schema} ->
@@ -260,17 +266,22 @@ defmodule Elixact.JsonSchema.Resolver do
   end
 
   defp resolve_schema_part(schema, _context, _depth) when is_map(schema) do
-    schema  # Base case: return schema as-is
+    # Base case: return schema as-is
+    schema
   end
 
   defp resolve_schema_part(schema, _context, _depth) do
-    schema  # Handle non-map schemas
+    # Handle non-map schemas
+    schema
   end
 
-  @spec resolve_reference(String.t(), map(), non_neg_integer()) :: {:ok, schema()} | {:error, String.t()}
+  @spec resolve_reference(String.t(), map(), non_neg_integer()) ::
+          {:ok, schema()} | {:error, String.t()}
   defp resolve_reference("#/definitions/" <> def_name, context, depth) do
     case Map.get(context.definitions, def_name) do
-      nil -> {:error, "Definition not found: #{def_name}"}
+      nil ->
+        {:error, "Definition not found: #{def_name}"}
+
       definition ->
         if MapSet.member?(context.visited, def_name) do
           {:error, "Circular reference detected: #{def_name}"}
@@ -290,14 +301,12 @@ defmodule Elixact.JsonSchema.Resolver do
     {:error, "Unsupported reference format: #{ref}"}
   end
 
-  @spec merge_schema_properties(schema(), map(), map()) :: schema()
   defp merge_schema_properties(resolved, additional_props, context) do
     resolved
     |> merge_if_preserve_titles(additional_props, context)
     |> merge_if_preserve_descriptions(additional_props, context)
   end
 
-  @spec merge_if_preserve_titles(schema(), map(), map()) :: schema()
   defp merge_if_preserve_titles(schema, additional_props, context) do
     if context.preserve_titles and Map.has_key?(additional_props, "title") do
       Map.put(schema, "title", additional_props["title"])
@@ -306,7 +315,6 @@ defmodule Elixact.JsonSchema.Resolver do
     end
   end
 
-  @spec merge_if_preserve_descriptions(schema(), map(), map()) :: schema()
   defp merge_if_preserve_descriptions(schema, additional_props, context) do
     if context.preserve_descriptions and Map.has_key?(additional_props, "description") do
       Map.put(schema, "description", additional_props["description"])
@@ -323,7 +331,10 @@ defmodule Elixact.JsonSchema.Resolver do
   end
 
   @spec inline_simple_types(schema(), boolean()) :: schema()
-  defp inline_simple_types(%{"type" => "object", "properties" => properties} = schema, preserve_complex) do
+  defp inline_simple_types(
+         %{"type" => "object", "properties" => properties} = schema,
+         preserve_complex
+       ) do
     inlined_properties =
       properties
       |> Enum.map(fn {key, prop_schema} ->
@@ -357,7 +368,7 @@ defmodule Elixact.JsonSchema.Resolver do
 
   defp apply_provider_rules(schema, :anthropic, remove_unsupported) do
     schema
-    |> maybe_remove_additional_properties_true(remove_unsupported)
+    |> maybe_set_additional_properties_false_anthropic(remove_unsupported)
     |> maybe_remove_unsupported_formats(remove_unsupported, [:uri, :uuid])
     |> ensure_required_array_exists()
   end
@@ -380,6 +391,16 @@ defmodule Elixact.JsonSchema.Resolver do
 
   defp maybe_remove_additional_properties_true(schema, false), do: schema
 
+  @spec maybe_set_additional_properties_false_anthropic(schema(), boolean()) :: schema()
+  defp maybe_set_additional_properties_false_anthropic(schema, true) do
+    case Map.get(schema, "additionalProperties") do
+      nil -> schema
+      _ -> Map.put(schema, "additionalProperties", false)
+    end
+  end
+
+  defp maybe_set_additional_properties_false_anthropic(schema, false), do: schema
+
   @spec maybe_remove_unsupported_formats(schema(), boolean(), [atom()]) :: schema()
   defp maybe_remove_unsupported_formats(schema, true, unsupported_formats) do
     case Map.get(schema, "format") do
@@ -389,6 +410,7 @@ defmodule Elixact.JsonSchema.Resolver do
         else
           schema
         end
+
       _ ->
         schema
     end
@@ -397,8 +419,10 @@ defmodule Elixact.JsonSchema.Resolver do
 
   defp maybe_remove_unsupported_formats(schema, false, _), do: schema
 
-  @spec remove_formats_recursively(schema(), [atom()]) :: schema()
-  defp remove_formats_recursively(%{"type" => "object", "properties" => properties} = schema, unsupported) do
+  defp remove_formats_recursively(
+         %{"type" => "object", "properties" => properties} = schema,
+         unsupported
+       ) do
     cleaned_properties =
       properties
       |> Enum.map(fn {key, prop_schema} ->
@@ -445,6 +469,7 @@ defmodule Elixact.JsonSchema.Resolver do
         schema
         |> Map.put_new("additionalProperties", false)
         |> ensure_object_has_properties()
+
       _ ->
         schema
     end
@@ -457,6 +482,7 @@ defmodule Elixact.JsonSchema.Resolver do
         schema
         |> Map.put_new("additionalProperties", false)
         |> ensure_required_array_exists()
+
       _ ->
         schema
     end
@@ -470,7 +496,8 @@ defmodule Elixact.JsonSchema.Resolver do
   defp validate_structured_output(schema, provider) do
     case validate_schema_constraints(schema, provider) do
       {:ok, validated_schema} -> validated_schema
-      {:error, _reason} -> schema  # Return original if validation fails
+      # Return original if validation fails
+      {:error, _reason} -> schema
     end
   end
 
@@ -563,7 +590,10 @@ defmodule Elixact.JsonSchema.Resolver do
   @spec maybe_limit_properties(schema(), non_neg_integer() | nil) :: schema()
   defp maybe_limit_properties(schema, nil), do: schema
 
-  defp maybe_limit_properties(%{"type" => "object", "properties" => properties} = schema, max_props)
+  defp maybe_limit_properties(
+         %{"type" => "object", "properties" => properties} = schema,
+         max_props
+       )
        when map_size(properties) > max_props do
     # Keep only the first N properties (in key order)
     limited_properties =

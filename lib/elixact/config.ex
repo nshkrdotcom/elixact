@@ -1,7 +1,7 @@
 defmodule Elixact.Config do
   @moduledoc """
   Advanced configuration with runtime modification support.
-  
+
   This module provides functionality for creating and manipulating validation
   configuration at runtime, supporting the DSPy pattern of dynamic config
   modification like `ConfigDict(extra="forbid", frozen=True)`.
@@ -9,18 +9,30 @@ defmodule Elixact.Config do
 
   @enforce_keys []
   defstruct [
-    strict: false,           # Enforce strict validation (no extra fields)
-    extra: :allow,           # How to handle extra fields (:allow, :forbid, :ignore)
-    coercion: :safe,         # Type coercion strategy (:none, :safe, :aggressive)
-    frozen: false,           # Whether the config is immutable
-    validate_assignment: false, # Validate field assignments
-    use_enum_values: false,  # Use enum values instead of names
-    allow_population_by_field_name: true, # Allow both field names and aliases
-    case_sensitive: true,    # Case sensitivity for field names
-    error_format: :detailed, # Error format (:detailed, :simple, :minimal)
-    max_anyof_union_len: 5,  # Maximum length for anyOf unions
-    title_generator: nil,    # Function to generate titles
-    description_generator: nil # Function to generate descriptions
+    # Enforce strict validation (no extra fields)
+    strict: false,
+    # How to handle extra fields (:allow, :forbid, :ignore)
+    extra: :allow,
+    # Type coercion strategy (:none, :safe, :aggressive)
+    coercion: :safe,
+    # Whether the config is immutable
+    frozen: false,
+    # Validate field assignments
+    validate_assignment: false,
+    # Use enum values instead of names
+    use_enum_values: false,
+    # Allow both field names and aliases
+    allow_population_by_field_name: true,
+    # Case sensitivity for field names
+    case_sensitive: true,
+    # Error format (:detailed, :simple, :minimal)
+    error_format: :detailed,
+    # Maximum length for anyOf unions
+    max_anyof_union_len: 5,
+    # Function to generate titles
+    title_generator: nil,
+    # Function to generate descriptions
+    description_generator: nil
   ]
 
   @type extra_strategy :: :allow | :forbid | :ignore
@@ -69,13 +81,25 @@ defmodule Elixact.Config do
   """
   @spec create(keyword() | map()) :: t()
   def create(opts \\ []) do
-    opts_map = 
+    opts_map =
       case opts do
         map when is_map(map) -> map
         keyword when is_list(keyword) -> Map.new(keyword)
       end
 
-    struct!(__MODULE__, opts_map)
+    # Validate that all keys are valid struct fields
+    valid_keys = __MODULE__.__struct__() |> Map.keys() |> MapSet.new()
+    provided_keys = opts_map |> Map.keys() |> MapSet.new()
+
+    case MapSet.difference(provided_keys, valid_keys) |> MapSet.to_list() do
+      [] ->
+        # Validate option values
+        validate_option_values!(opts_map)
+        struct!(__MODULE__, opts_map)
+
+      invalid_keys ->
+        raise ArgumentError, "Invalid configuration options: #{inspect(invalid_keys)}"
+    end
   end
 
   @doc """
@@ -100,12 +124,27 @@ defmodule Elixact.Config do
       ** (RuntimeError) Cannot modify frozen configuration
   """
   @spec merge(t(), map() | keyword()) :: t()
-  def merge(%__MODULE__{frozen: true} = _config, overrides) when map_size(overrides) > 0 or length(overrides) > 0 do
-    raise "Cannot modify frozen configuration"
+  def merge(%__MODULE__{frozen: true} = config, overrides) do
+    overrides_map =
+      case overrides do
+        map when is_map(map) -> map
+        keyword when is_list(keyword) -> Map.new(keyword)
+      end
+
+    # Check if overrides is empty
+    is_empty = map_size(overrides_map) == 0
+
+    if is_empty do
+      # Return the frozen config unchanged for empty overrides
+      config
+    else
+      # Frozen configs cannot be modified - this is the expected behavior
+      raise RuntimeError, "Cannot modify frozen configuration"
+    end
   end
 
   def merge(%__MODULE__{} = base_config, overrides) do
-    overrides_map = 
+    overrides_map =
       case overrides do
         map when is_map(map) -> map
         keyword when is_list(keyword) -> Map.new(keyword)
@@ -139,7 +178,7 @@ defmodule Elixact.Config do
       iex> Elixact.Config.preset(:lenient)
       %Elixact.Config{strict: false, extra: :allow, coercion: :safe, ...}
   """
-  @spec preset(atom()) :: t()
+  @spec preset(:strict | :lenient | :api | :json_schema | :development | :production) :: t()
   def preset(:strict) do
     create(%{
       strict: true,
@@ -236,21 +275,21 @@ defmodule Elixact.Config do
   def validate_config(%__MODULE__{} = config) do
     errors = []
 
-    errors = 
+    errors =
       if config.strict and config.extra == :allow do
         ["strict mode conflicts with extra: :allow" | errors]
       else
         errors
       end
 
-    errors = 
+    errors =
       if config.coercion == :aggressive and config.validate_assignment do
         ["aggressive coercion conflicts with validate_assignment" | errors]
       else
         errors
       end
 
-    errors = 
+    errors =
       if config.max_anyof_union_len < 1 do
         ["max_anyof_union_len must be at least 1" | errors]
       else
@@ -404,15 +443,23 @@ defmodule Elixact.Config do
         features: ["validate_assignment", ...]
       }
   """
-  @spec summary(t()) :: map()
+  @spec summary(t()) :: %{
+          validation_mode: String.t(),
+          extra_fields: String.t(),
+          coercion: String.t(),
+          frozen: boolean(),
+          error_format: String.t(),
+          features: [String.t()]
+        }
   def summary(%__MODULE__{} = config) do
     %{
       validation_mode: if(config.strict, do: "strict", else: "lenient"),
-      extra_fields: case config.extra do
-        :allow -> "allowed"
-        :forbid -> "forbidden"
-        :ignore -> "ignored"
-      end,
+      extra_fields:
+        case config.extra do
+          :allow -> "allowed"
+          :forbid -> "forbidden"
+          :ignore -> "ignored"
+        end,
       coercion: Atom.to_string(config.coercion),
       frozen: config.frozen,
       error_format: Atom.to_string(config.error_format),
@@ -442,16 +489,79 @@ defmodule Elixact.Config do
 
   # Private helper functions
 
+  @spec validate_option_values!(map()) :: :ok
+  defp validate_option_values!(opts_map) do
+    Enum.each(opts_map, fn {key, value} ->
+      case key do
+        :strict ->
+          unless is_boolean(value), do: raise(ArgumentError, "strict must be a boolean")
+
+        :extra ->
+          unless value in [:allow, :forbid, :ignore],
+            do: raise(ArgumentError, "extra must be :allow, :forbid, or :ignore")
+
+        :coercion ->
+          unless value in [:none, :safe, :aggressive],
+            do: raise(ArgumentError, "coercion must be :none, :safe, or :aggressive")
+
+        :frozen ->
+          unless is_boolean(value), do: raise(ArgumentError, "frozen must be a boolean")
+
+        :validate_assignment ->
+          unless is_boolean(value),
+            do: raise(ArgumentError, "validate_assignment must be a boolean")
+
+        :use_enum_values ->
+          unless is_boolean(value), do: raise(ArgumentError, "use_enum_values must be a boolean")
+
+        :allow_population_by_field_name ->
+          unless is_boolean(value),
+            do: raise(ArgumentError, "allow_population_by_field_name must be a boolean")
+
+        :case_sensitive ->
+          unless is_boolean(value), do: raise(ArgumentError, "case_sensitive must be a boolean")
+
+        :error_format ->
+          unless value in [:detailed, :simple, :minimal],
+            do: raise(ArgumentError, "error_format must be :detailed, :simple, or :minimal")
+
+        :max_anyof_union_len ->
+          unless is_integer(value),
+            do: raise(ArgumentError, "max_anyof_union_len must be an integer")
+
+        :title_generator ->
+          unless is_nil(value) or is_function(value, 1),
+            do: raise(ArgumentError, "title_generator must be a function or nil")
+
+        :description_generator ->
+          unless is_nil(value) or is_function(value, 1),
+            do: raise(ArgumentError, "description_generator must be a function or nil")
+
+        _ ->
+          :ok
+      end
+    end)
+  end
+
   @spec enabled_features(t()) :: [String.t()]
   defp enabled_features(config) do
     features = []
 
-    features = if config.validate_assignment, do: ["validate_assignment" | features], else: features
+    features =
+      if config.validate_assignment, do: ["validate_assignment" | features], else: features
+
     features = if config.use_enum_values, do: ["use_enum_values" | features], else: features
-    features = if config.allow_population_by_field_name, do: ["field_name_population" | features], else: features
+
+    features =
+      if config.allow_population_by_field_name,
+        do: ["field_name_population" | features],
+        else: features
+
     features = if config.case_sensitive, do: ["case_sensitive" | features], else: features
     features = if config.title_generator, do: ["title_generator" | features], else: features
-    features = if config.description_generator, do: ["description_generator" | features], else: features
+
+    features =
+      if config.description_generator, do: ["description_generator" | features], else: features
 
     Enum.reverse(features)
   end

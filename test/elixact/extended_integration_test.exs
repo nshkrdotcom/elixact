@@ -63,10 +63,11 @@ defmodule Elixact.ExtendedIntegrationTest do
         {:sources, {:array, :string}, [description: "Information sources"]}
       ]
 
-      schema = Runtime.create_schema(fields,
-        title: "DSPyProgramOutputs",
-        description: "Output schema for DSPy program"
-      )
+      schema =
+        Runtime.create_schema(fields,
+          title: "DSPyProgramOutputs",
+          description: "Output schema for DSPy program"
+        )
 
       # Test with valid data
       output_data = %{
@@ -108,12 +109,14 @@ defmodule Elixact.ExtendedIntegrationTest do
       ]
 
       for {field_name, type_spec, value, constraints} <- wrapper_cases do
-        assert {:ok, validated} = Wrapper.wrap_and_validate(
-          field_name,
-          type_spec,
-          value,
-          constraints: constraints
-        )
+        assert {:ok, validated} =
+                 Wrapper.wrap_and_validate(
+                   field_name,
+                   type_spec,
+                   value,
+                   constraints: constraints
+                 )
+
         assert validated == value
       end
     end
@@ -123,12 +126,13 @@ defmodule Elixact.ExtendedIntegrationTest do
       base_config = Config.create()
 
       # Apply DSPy-style configuration
-      dspy_config = Config.merge(base_config, %{
-        extra: :forbid,
-        frozen: true,
-        strict: true,
-        validate_assignment: true
-      })
+      dspy_config =
+        Config.merge(base_config, %{
+          extra: :forbid,
+          frozen: true,
+          strict: true,
+          validate_assignment: true
+        })
 
       assert dspy_config.extra == :forbid
       assert dspy_config.frozen == true
@@ -146,15 +150,17 @@ defmodule Elixact.ExtendedIntegrationTest do
       # Create a complex schema with nested types
       fields = [
         {:user, {:map, {:string, :any}}, [required: true]},
-        {:preferences, {:map, {:string, {:union, [:string, :boolean, :integer]}}}, [required: false]},
+        {:preferences, {:map, {:string, {:union, [:string, :boolean, :integer]}}},
+         [required: false]},
         {:tags, {:array, :string}, [min_items: 0, max_items: 20]},
         {:metadata, {:map, {:string, :any}}, [description: "Additional metadata"]}
       ]
 
-      schema = Runtime.create_schema(fields,
-        title: "Complex User Schema",
-        description: "A comprehensive user data schema"
-      )
+      schema =
+        Runtime.create_schema(fields,
+          title: "Complex User Schema",
+          description: "A comprehensive user data schema"
+        )
 
       json_schema = Runtime.to_json_schema(schema)
 
@@ -196,4 +202,20 @@ defmodule Elixact.ExtendedIntegrationTest do
       # Verify structure is preserved
       data_prop = flattened["properties"]["data"]
       assert data_prop["type"] == "array"
-      assert
+      assert Map.has_key?(data_prop, "items")
+    end
+  end
+
+  # Helper function for checking references
+  defp has_references?(schema) when is_map(schema) do
+    Enum.any?(schema, fn {key, value} ->
+      key == "$ref" or has_references?(value)
+    end)
+  end
+
+  defp has_references?(value) when is_list(value) do
+    Enum.any?(value, &has_references?/1)
+  end
+
+  defp has_references?(_), do: false
+end
