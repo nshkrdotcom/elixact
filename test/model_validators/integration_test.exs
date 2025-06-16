@@ -3,43 +3,129 @@ defmodule Elixact.ModelValidatorIntegrationTest do
 
   @moduletag :integration
 
-  describe "integration with existing Elixact features" do
-    test "model validators work with EnhancedValidator" do
-      defmodule EnhancedIntegrationSchema do
-        use Elixact, define_struct: true
+  # Define all test schemas at module level to avoid compilation issues
+  defmodule EnhancedIntegrationSchema do
+    use Elixact, define_struct: true
 
-        schema do
-          field :value, :integer, required: true
-          model_validator :validate_positive
-        end
+    schema do
+      field(:value, :integer, required: true)
+      model_validator(:validate_positive)
+    end
 
-        def validate_positive(data) do
-          if data.value > 0, do: {:ok, data}, else: {:error, "must be positive"}
-        end
+    def validate_positive(data) do
+      if data.value > 0, do: {:ok, data}, else: {:error, "must be positive"}
+    end
+  end
+
+  defmodule JsonSchemaIntegrationTest do
+    use Elixact, define_struct: true
+
+    schema do
+      field(:name, :string, required: true)
+      model_validator(:validate_name_length)
+    end
+
+    def validate_name_length(data) do
+      if String.length(data.name) > 2, do: {:ok, data}, else: {:error, "name too short"}
+    end
+  end
+
+  defmodule FullFeatureSchema do
+    use Elixact, define_struct: true
+
+    schema "Full feature test" do
+      field :name, :string do
+        required()
+        min_length(2)
+        max_length(50)
       end
 
+      field :age, :integer do
+        optional()
+        gteq(0)
+        lteq(150)
+      end
+
+      field :tags, {:array, :string} do
+        optional()
+        min_items(1)
+      end
+
+      model_validator(:validate_age_name_consistency)
+
+      config do
+        title("Full Feature Schema")
+        strict(true)
+      end
+    end
+
+    def validate_age_name_consistency(data) do
+      # Silly example: if age > 100, name must start with "Elder"
+      if data.age && data.age > 100 do
+        if String.starts_with?(data.name, "Elder") do
+          {:ok, data}
+        else
+          {:error, "centenarians must have names starting with 'Elder'"}
+        end
+      else
+        {:ok, data}
+      end
+    end
+  end
+
+  defmodule PerfTestSchema do
+    use Elixact, define_struct: true
+
+    schema do
+      field(:value, :integer, required: true)
+      model_validator(:simple_validation)
+    end
+
+    def simple_validation(data) do
+      if data.value > 0, do: {:ok, data}, else: {:error, "positive only"}
+    end
+  end
+
+  defmodule PerfTestNoValidator do
+    use Elixact, define_struct: true
+
+    schema do
+      field(:value, :integer, required: true)
+    end
+  end
+
+  defmodule MultiPerfSchema do
+    use Elixact, define_struct: true
+
+    schema do
+      field(:a, :integer, required: true)
+      field(:b, :integer, required: true)
+      field(:c, :integer, required: true)
+
+      model_validator(:validate_a)
+      model_validator(:validate_b)
+      model_validator(:validate_c)
+    end
+
+    def validate_a(data), do: if(data.a > 0, do: {:ok, data}, else: {:error, "a positive"})
+    def validate_b(data), do: if(data.b > 0, do: {:ok, data}, else: {:error, "b positive"})
+    def validate_c(data), do: if(data.c > 0, do: {:ok, data}, else: {:error, "c positive"})
+  end
+
+  describe "integration with existing Elixact features" do
+    test "model validators work with EnhancedValidator" do
       # Test with EnhancedValidator
-      assert {:ok, result} = Elixact.EnhancedValidator.validate(EnhancedIntegrationSchema, %{value: 5})
+      assert {:ok, result} =
+               Elixact.EnhancedValidator.validate(EnhancedIntegrationSchema, %{value: 5})
+
       assert %EnhancedIntegrationSchema{} = result
       assert result.value == 5
 
-      assert {:error, _} = Elixact.EnhancedValidator.validate(EnhancedIntegrationSchema, %{value: -1})
+      assert {:error, _} =
+               Elixact.EnhancedValidator.validate(EnhancedIntegrationSchema, %{value: -1})
     end
 
     test "model validators work with JSON schema generation" do
-      defmodule JsonSchemaIntegrationTest do
-        use Elixact, define_struct: true
-
-        schema do
-          field :name, :string, required: true
-          model_validator :validate_name_length
-        end
-
-        def validate_name_length(data) do
-          if String.length(data.name) > 2, do: {:ok, data}, else: {:error, "name too short"}
-        end
-      end
-
       # JSON schema generation should work normally (model validators don't affect schema)
       json_schema = Elixact.JsonSchema.from_schema(JsonSchemaIntegrationTest)
 
@@ -56,62 +142,25 @@ defmodule Elixact.ModelValidatorIntegrationTest do
     end
 
     test "model validators preserve all existing schema functionality" do
-      defmodule FullFeatureSchema do
-        use Elixact, define_struct: true
-
-        schema "Full feature test" do
-          field :name, :string do
-            required()
-            min_length(2)
-            max_length(50)
-          end
-
-          field :age, :integer do
-            optional()
-            gteq(0)
-            lteq(150)
-          end
-
-          field :tags, {:array, :string} do
-            optional()
-            min_items(1)
-          end
-
-          model_validator :validate_age_name_consistency
-
-          config do
-            title("Full Feature Schema")
-            strict(true)
-          end
-        end
-
-        def validate_age_name_consistency(data) do
-          # Silly example: if age > 100, name must start with "Elder"
-          if data.age && data.age > 100 do
-            if String.starts_with?(data.name, "Elder") do
-              {:ok, data}
-            else
-              {:error, "centenarians must have names starting with 'Elder'"}
-            end
-          else
-            {:ok, data}
-          end
-        end
-      end
-
       # Test all field validations still work
       valid_data = %{name: "Elder Smith", age: 105, tags: ["wise", "old"]}
       assert {:ok, result} = FullFeatureSchema.validate(valid_data)
       assert %FullFeatureSchema{} = result
 
       # Test field validation failures
-      assert {:error, _} = FullFeatureSchema.validate(%{name: "X"})  # Too short
-      assert {:error, _} = FullFeatureSchema.validate(%{name: "Valid", age: -1})  # Age negative
+      # Too short
+      assert {:error, _} = FullFeatureSchema.validate(%{name: "X"})
+      # Age negative
+      assert {:error, _} = FullFeatureSchema.validate(%{name: "Valid", age: -1})
 
       # Test model validation failure
-      invalid_data = %{name: "Young Smith", age: 105}  # Age > 100 but name doesn't start with Elder
+      # Age > 100 but name doesn't start with Elder
+      invalid_data = %{name: "Young Smith", age: 105}
       assert {:error, errors} = FullFeatureSchema.validate(invalid_data)
-      assert hd(errors).message == "centenarians must have names starting with 'Elder'"
+
+      # Handle case where errors might be a single error or list
+      error_list = if is_list(errors), do: errors, else: [errors]
+      assert hd(error_list).message == "centenarians must have names starting with 'Elder'"
 
       # Test schema introspection still works
       assert FullFeatureSchema.__schema__(:description) == "Full feature test"
@@ -123,27 +172,6 @@ defmodule Elixact.ModelValidatorIntegrationTest do
   describe "performance characteristics" do
     @tag :performance
     test "model validators add minimal overhead" do
-      defmodule PerfTestSchema do
-        use Elixact, define_struct: true
-
-        schema do
-          field :value, :integer, required: true
-          model_validator :simple_validation
-        end
-
-        def simple_validation(data) do
-          if data.value > 0, do: {:ok, data}, else: {:error, "positive only"}
-        end
-      end
-
-      defmodule PerfTestNoValidator do
-        use Elixact, define_struct: true
-
-        schema do
-          field :value, :integer, required: true
-        end
-      end
-
       data = %{value: 42}
 
       # Warm up
@@ -151,18 +179,20 @@ defmodule Elixact.ModelValidatorIntegrationTest do
       PerfTestNoValidator.validate(data)
 
       # Measure without model validator
-      {time_without, _} = :timer.tc(fn ->
-        Enum.each(1..1000, fn _ ->
-          PerfTestNoValidator.validate(data)
+      {time_without, _} =
+        :timer.tc(fn ->
+          Enum.each(1..1000, fn _ ->
+            PerfTestNoValidator.validate(data)
+          end)
         end)
-      end)
 
       # Measure with model validator
-      {time_with, _} = :timer.tc(fn ->
-        Enum.each(1..1000, fn _ ->
-          PerfTestSchema.validate(data)
+      {time_with, _} =
+        :timer.tc(fn ->
+          Enum.each(1..1000, fn _ ->
+            PerfTestSchema.validate(data)
+          end)
         end)
-      end)
 
       overhead_ratio = time_with / time_without
 
@@ -172,31 +202,14 @@ defmodule Elixact.ModelValidatorIntegrationTest do
 
     @tag :performance
     test "multiple model validators performance is reasonable" do
-      defmodule MultiPerfSchema do
-        use Elixact, define_struct: true
-
-        schema do
-          field :a, :integer, required: true
-          field :b, :integer, required: true
-          field :c, :integer, required: true
-
-          model_validator :validate_a
-          model_validator :validate_b
-          model_validator :validate_c
-        end
-
-        def validate_a(data), do: if data.a > 0, do: {:ok, data}, else: {:error, "a positive"}
-        def validate_b(data), do: if data.b > 0, do: {:ok, data}, else: {:error, "b positive"}
-        def validate_c(data), do: if data.c > 0, do: {:ok, data}, else: {:error, "c positive"}
-      end
-
       data = %{a: 1, b: 2, c: 3}
 
-      {time_micro, _} = :timer.tc(fn ->
-        Enum.each(1..1000, fn _ ->
-          MultiPerfSchema.validate(data)
+      {time_micro, _} =
+        :timer.tc(fn ->
+          Enum.each(1..1000, fn _ ->
+            MultiPerfSchema.validate(data)
+          end)
         end)
-      end)
 
       avg_time_ms = time_micro / 1000 / 1000
 

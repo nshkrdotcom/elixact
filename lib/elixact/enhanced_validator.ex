@@ -81,7 +81,11 @@ defmodule Elixact.EnhancedValidator do
       config = Keyword.get(opts, :config, Config.create())
       validation_opts = Config.to_validation_opts(config)
 
-      case Elixact.Validator.validate_schema(schema_module, input, validation_opts[:path] || []) do
+      case Elixact.StructValidator.validate_schema(
+             schema_module,
+             input,
+             validation_opts[:path] || []
+           ) do
         {:ok, validated} -> {:ok, validated}
         {:error, errors} -> {:error, List.wrap(errors)}
       end

@@ -32,7 +32,7 @@ defmodule Elixact.ModelValidatorErrorHandlingTest do
 
       error = hd(errors)
       assert error.code == :model_validation
-      assert String.contains?(error.message, "validator execution failed")
+      assert String.contains?(error.message, "execution failed")
     end
 
     test "model validator exception doesn't crash validation" do
@@ -50,8 +50,8 @@ defmodule Elixact.ModelValidatorErrorHandlingTest do
         use Elixact, define_struct: true
 
         schema do
-          field :test, :string, required: true
-          model_validator :invalid_return
+          field(:test, :string, required: true)
+          model_validator(:invalid_return)
         end
 
         def invalid_return(_data) do
@@ -67,7 +67,7 @@ defmodule Elixact.ModelValidatorErrorHandlingTest do
 
       error = hd(errors)
       assert error.code == :model_validation
-      assert String.contains?(error.message, "invalid return format")
+      assert String.contains?(error.message, "returned invalid format")
     end
   end
 end

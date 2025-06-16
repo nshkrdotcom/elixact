@@ -38,7 +38,8 @@ defmodule Elixact.OptionalFieldsTest do
     end
 
     test "uses default display preference" do
-      data = %{name: "John Doe"}  # display_preference will use default "name"
+      # display_preference will use default "name"
+      data = %{name: "John Doe"}
 
       assert {:ok, result} = OptionalFieldValidator.validate(data)
       assert result.display_preference == "name"

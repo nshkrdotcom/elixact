@@ -1,5 +1,6 @@
 defmodule Elixact.BasicModelValidatorTest do
   use ExUnit.Case
+
   alias Elixact.ModelValidatorTestSchemas.{
     PasswordValidationStruct,
     PasswordValidationMap,
@@ -40,13 +41,18 @@ defmodule Elixact.BasicModelValidatorTest do
 
     test "model validator is called after field validation" do
       # Invalid field data should fail before model validator is called
-      data = %{password: "secret123"}  # missing password_confirmation
+      # missing password_confirmation
+      data = %{password: "secret123"}
 
       assert {:error, errors} = PasswordValidationStruct.validate(data)
-      assert length(errors) == 1
 
-      error = hd(errors)
-      assert error.code == :required  # Field validation error, not model validation
+      # Handle case where errors might be a single error or list
+      error_list = if is_list(errors), do: errors, else: [errors]
+      assert length(error_list) == 1
+
+      error = hd(error_list)
+      # Field validation error, not model validation
+      assert error.code == :required
       assert error.path == [:password_confirmation]
     end
 

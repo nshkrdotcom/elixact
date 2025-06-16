@@ -8,8 +8,10 @@ defmodule Elixact.DataTransformationTest do
 
       assert {:ok, result} = DataTransformer.validate(data)
       assert %DataTransformer{} = result
-      assert result.name == "John Doe"  # Trimmed
-      assert result.email == "john@example.com"  # Trimmed and lowercased
+      # Trimmed
+      assert result.name == "John Doe"
+      # Trimmed and lowercased
+      assert result.email == "john@example.com"
     end
 
     test "model validator can add additional fields to struct" do
@@ -19,7 +21,8 @@ defmodule Elixact.DataTransformationTest do
       assert %DataEnhancer{} = result
       assert result.first_name == "John"
       assert result.last_name == "Doe"
-      assert result.full_name == "John Doe"  # Added by model validator
+      # Added by model validator
+      assert result.full_name == "John Doe"
     end
 
     test "transformed data maintains struct type" do

@@ -19,7 +19,8 @@ defmodule Elixact.BusinessLogicTest do
     test "premium product pricing validation fails - price too low" do
       data = %{
         product_type: "premium",
-        price: 50.0,  # Too low for premium
+        # Too low for premium
+        price: 50.0,
         customer_tier: "regular",
         discount_percentage: 5.0
       }
@@ -34,7 +35,8 @@ defmodule Elixact.BusinessLogicTest do
         product_type: "basic",
         price: 30.0,
         customer_tier: "vip",
-        discount_percentage: 35.0  # Too high for VIP
+        # Too high for VIP
+        discount_percentage: 35.0
       }
 
       assert {:error, errors} = BusinessLogicValidator.validate(data)
@@ -45,16 +47,22 @@ defmodule Elixact.BusinessLogicTest do
     test "multiple business rule violations" do
       data = %{
         product_type: "basic",
-        price: 75.0,  # Too high for basic
+        # Too high for basic
+        price: 75.0,
         customer_tier: "regular",
-        discount_percentage: 15.0  # Too high for regular
+        # Too high for regular
+        discount_percentage: 15.0
       }
 
       assert {:error, errors} = BusinessLogicValidator.validate(data)
       assert length(errors) == 1
       # Should contain both error messages joined
       assert String.contains?(hd(errors).message, "basic products cannot cost more than $50")
-      assert String.contains?(hd(errors).message, "regular customers cannot have more than 10% discount")
+
+      assert String.contains?(
+               hd(errors).message,
+               "regular customers cannot have more than 10% discount"
+             )
     end
   end
 

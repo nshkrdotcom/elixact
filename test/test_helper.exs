@@ -2,6 +2,9 @@
 
 ExUnit.start()
 
+# Load test support modules
+Code.require_file("support/model_validator_test_schemas.ex", __DIR__)
+
 # Additional test configuration and helpers
 ExUnit.configure(
   exclude: [:slow, :integration, :performance, :memory_profile],
