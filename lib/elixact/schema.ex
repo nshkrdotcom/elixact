@@ -771,4 +771,67 @@ defmodule Elixact.Schema do
       var!(config) = Map.put(var!(config), :strict, unquote(bool))
     end
   end
+
+  @doc """
+  Defines a model-level validator that runs after field validation.
+
+  Model validators receive the validated data (as a map or struct) and can perform
+  cross-field validation, data transformation, or complex business logic validation.
+
+  ## Parameters
+    * `function_name` - Name of the function to call for model validation
+
+  ## Function Signature
+  The referenced function must accept one parameter (the validated data) and return:
+    * `{:ok, data}` - validation succeeds, optionally with transformed data
+    * `{:error, message}` - validation fails with error message
+    * `{:error, %Elixact.Error{}}` - validation fails with detailed error
+
+  ## Examples
+
+      defmodule UserSchema do
+        use Elixact, define_struct: true
+
+        schema do
+          field :password, :string, required: true
+          field :password_confirmation, :string, required: true
+
+          model_validator :validate_passwords_match
+        end
+
+        def validate_passwords_match(data) do
+          if data.password == data.password_confirmation do
+            {:ok, data}
+          else
+            {:error, "passwords do not match"}
+          end
+        end
+      end
+
+  ## Multiple Validators
+  Multiple model validators can be defined and will execute in the order they are declared:
+
+      schema do
+        field :username, :string, required: true
+        field :email, :string, required: true
+
+        model_validator :validate_username_unique
+        model_validator :validate_email_format
+        model_validator :send_welcome_email
+      end
+
+  ## Data Transformation
+  Model validators can transform the data by returning modified data:
+
+      def normalize_email(data) do
+        normalized = %{data | email: String.downcase(data.email)}
+        {:ok, normalized}
+      end
+  """
+  @spec model_validator(atom()) :: Macro.t()
+  defmacro model_validator(function_name) when is_atom(function_name) do
+    quote do
+      @model_validators {__MODULE__, unquote(function_name)}
+    end
+  end
 end

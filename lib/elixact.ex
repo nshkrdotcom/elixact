@@ -115,6 +115,7 @@ defmodule Elixact do
       Module.register_attribute(__MODULE__, :fields, accumulate: true)
       Module.register_attribute(__MODULE__, :validations, accumulate: true)
       Module.register_attribute(__MODULE__, :config, [])
+      Module.register_attribute(__MODULE__, :model_validators, accumulate: true)
 
       # Store struct option for use in __before_compile__
       @elixact_define_struct unquote(define_struct?)
@@ -204,6 +205,7 @@ defmodule Elixact do
       def __schema__(:fields), do: @fields
       def __schema__(:validations), do: @validations
       def __schema__(:config), do: @config
+      def __schema__(:model_validators), do: @model_validators || []
 
       @doc """
       Validates data against this schema.
