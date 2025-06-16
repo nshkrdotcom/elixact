@@ -11,7 +11,7 @@ defmodule Elixact.Runtime.DynamicSchema do
   defstruct [
     # String - Unique identifier for the schema
     :name,
-    # Map - Field name -> FieldMeta mapping  
+    # Map - Field name -> FieldMeta mapping
     :fields,
     # Map - Schema configuration options
     :config,

@@ -1,9 +1,9 @@
 defmodule Elixact.RuntimeTest do
   use ExUnit.Case, async: true
 
+  alias Elixact.Error
   alias Elixact.Runtime
   alias Elixact.Runtime.DynamicSchema
-  alias Elixact.Error
 
   describe "create_schema/2" do
     test "creates schema with basic field definitions" do

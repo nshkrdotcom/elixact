@@ -1,9 +1,10 @@
 defmodule Elixact.WrapperTest do
   use ExUnit.Case, async: true
 
-  alias Elixact.Wrapper
-  alias Elixact.Runtime.DynamicSchema
   alias Elixact.Error
+  alias Elixact.JsonSchema.Resolver
+  alias Elixact.Runtime.DynamicSchema
+  alias Elixact.Wrapper
 
   describe "create_wrapper/3" do
     test "generates single-field schema with basic type" do
@@ -520,7 +521,7 @@ defmodule Elixact.WrapperTest do
       schema = Wrapper.to_json_schema(wrapper)
 
       # Should be able to resolve references (even though wrapper has none)
-      resolved = Elixact.JsonSchema.Resolver.resolve_references(schema)
+      resolved = Resolver.resolve_references(schema)
       assert resolved["type"] == "object"
       assert resolved["properties"]["data"]["type"] == "object"
     end

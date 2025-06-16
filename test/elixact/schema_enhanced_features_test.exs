@@ -48,7 +48,7 @@ defmodule Elixact.SchemaEnhancedFeaturesTest do
     test "validates schema with atom types and choices" do
       # Valid data with all enhanced features
       valid_data = %{
-        user_id: 12345,
+        user_id: 12_345,
         role: :admin,
         email: "admin@example.com",
         preferences: %{
@@ -194,7 +194,7 @@ defmodule Elixact.SchemaEnhancedFeaturesTest do
         field :port, :integer do
           required()
           gt(0)
-          lt(65536)
+          lt(65_536)
         end
 
         field :ssl, :boolean do
@@ -255,7 +255,7 @@ defmodule Elixact.SchemaEnhancedFeaturesTest do
       assert validated.features.new_ui == true
 
       # Test nested validation in object
-      invalid_port = %{config_data | database: %{host: "db.example.com", port: 70000, ssl: true}}
+      invalid_port = %{config_data | database: %{host: "db.example.com", port: 70_000, ssl: true}}
       assert {:error, error} = ConfigSchema.validate(invalid_port)
       assert error.path == [:database, :port]
       assert error.code == :lt

@@ -9,7 +9,9 @@ defmodule Elixact.TypeAdapter do
   Supports the DSPy pattern: `TypeAdapter(type(value)).validate_python(value)`
   """
 
-  alias Elixact.{Types, Validator, JsonSchema}
+  alias Elixact.{JsonSchema, Types, Validator}
+  alias Elixact.JsonSchema.Resolver
+  alias Elixact.TypeAdapter.Instance
 
   @type type_spec :: Types.type_definition() | atom() | module() | term()
   @type validation_options :: [
@@ -179,7 +181,7 @@ defmodule Elixact.TypeAdapter do
 
       # Resolve references if requested
       if Keyword.get(opts, :resolve_refs, false) do
-        Elixact.JsonSchema.Resolver.resolve_references(final_schema)
+        Resolver.resolve_references(final_schema)
       else
         final_schema
       end
@@ -206,9 +208,9 @@ defmodule Elixact.TypeAdapter do
       iex> Elixact.TypeAdapter.Instance.validate(adapter, ["a", "b", "c"])
       {:ok, ["a", "b", "c"]}
   """
-  @spec create(type_spec(), keyword()) :: Elixact.TypeAdapter.Instance.t()
+  @spec create(type_spec(), keyword()) :: Instance.t()
   def create(type_spec, opts \\ []) do
-    Elixact.TypeAdapter.Instance.new(type_spec, opts)
+    Instance.new(type_spec, opts)
   end
 
   # Private helper functions

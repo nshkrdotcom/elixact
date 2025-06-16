@@ -1,8 +1,8 @@
 defmodule Elixact.TypeAdapterTest do
   use ExUnit.Case, async: true
 
-  alias Elixact.TypeAdapter
   alias Elixact.Error
+  alias Elixact.TypeAdapter
 
   describe "validate/3 with basic types" do
     test "validates string types" do

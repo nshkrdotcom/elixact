@@ -108,36 +108,34 @@ defmodule Elixact.JsonSchema.ReferenceStore do
 
   @spec module_name(module()) :: String.t()
   defp module_name(module) do
-    cond do
-      is_atom(module) ->
-        # Handle plain atoms by converting to string and extracting last part
-        module_string =
+    if is_atom(module) do
+      # Handle plain atoms by converting to string and extracting last part
+      module_string =
+        module
+        |> Atom.to_string()
+        |> String.replace_prefix("Elixir.", "")
+
+      # For atoms with special characters that can't be split by Module.split,
+      # we need to handle them differently
+      case String.split(module_string, ".") do
+        [single_name] -> single_name
+        parts -> List.last(parts)
+      end
+    else
+      # Handle actual modules
+      try do
+        module
+        |> Module.split()
+        |> List.last()
+      rescue
+        ArgumentError ->
+          # If Module.split fails, fall back to atom string conversion
           module
           |> Atom.to_string()
           |> String.replace_prefix("Elixir.", "")
-
-        # For atoms with special characters that can't be split by Module.split,
-        # we need to handle them differently
-        case String.split(module_string, ".") do
-          [single_name] -> single_name
-          parts -> List.last(parts)
-        end
-
-      true ->
-        # Handle actual modules
-        try do
-          module
-          |> Module.split()
+          |> String.split(".")
           |> List.last()
-        rescue
-          ArgumentError ->
-            # If Module.split fails, fall back to atom string conversion
-            module
-            |> Atom.to_string()
-            |> String.replace_prefix("Elixir.", "")
-            |> String.split(".")
-            |> List.last()
-        end
+      end
     end
   end
 end

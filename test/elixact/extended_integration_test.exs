@@ -1,7 +1,7 @@
 defmodule Elixact.ExtendedIntegrationTest do
   use ExUnit.Case, async: true
 
-  alias Elixact.{Runtime, TypeAdapter, Wrapper, Config, EnhancedValidator}
+  alias Elixact.{Config, EnhancedValidator, Runtime, TypeAdapter, Wrapper}
   alias Elixact.JsonSchema.Resolver
 
   describe "runtime schema with TypeAdapter validation" do

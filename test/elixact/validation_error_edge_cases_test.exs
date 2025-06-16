@@ -1,6 +1,6 @@
 defmodule Elixact.ValidationErrorEdgeCasesTest do
   use ExUnit.Case, async: true
-  alias Elixact.{ValidationError, Error}
+  alias Elixact.{Error, ValidationError}
 
   describe "ValidationError edge cases" do
     test "handles empty error list" do

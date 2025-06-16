@@ -420,10 +420,10 @@ defmodule Elixact.CustomTypeEdgeCasesTest do
         end
 
         def custom_rules do
-          [:is_japanese_greeting]
+          [:japanese_greeting?]
         end
 
-        def is_japanese_greeting(value) do
+        def japanese_greeting?(value) do
           greetings = ["こんにちは", "おはよう", "こんばんは", "さようなら"]
           value in greetings
         end

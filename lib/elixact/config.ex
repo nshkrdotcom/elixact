@@ -35,6 +35,8 @@ defmodule Elixact.Config do
     description_generator: nil
   ]
 
+  alias Elixact.Config.Builder
+
   @type extra_strategy :: :allow | :forbid | :ignore
   @type coercion_strategy :: :none | :safe | :aggressive
   @type error_format :: :detailed | :simple | :minimal
@@ -482,9 +484,9 @@ defmodule Elixact.Config do
       ...> |> Elixact.Config.Builder.build()
       %Elixact.Config{strict: true, extra: :forbid, coercion: :safe, ...}
   """
-  @spec builder() :: Elixact.Config.Builder.t()
+  @spec builder() :: Builder.t()
   def builder do
-    Elixact.Config.Builder.new()
+    Builder.new()
   end
 
   # Private helper functions

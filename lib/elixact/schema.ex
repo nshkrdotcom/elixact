@@ -531,7 +531,7 @@ defmodule Elixact.Schema do
       end
   """
   @spec required() :: Macro.t()
-  defmacro required() do
+  defmacro required do
     quote do
       var!(field_meta) =
         var!(field_meta)
@@ -555,7 +555,7 @@ defmodule Elixact.Schema do
       end
   """
   @spec optional() :: Macro.t()
-  defmacro optional() do
+  defmacro optional do
     quote do
       var!(field_meta) =
         var!(field_meta)

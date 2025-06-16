@@ -106,7 +106,7 @@ defmodule Elixact.EnhancedFeaturesIntegrationTest do
             |> Types.with_validator(fn value ->
               # Capitalize each word
               capitalized =
-                value |> String.split() |> Enum.map(&String.capitalize/1) |> Enum.join(" ")
+                value |> String.split() |> Enum.map_join(" ", &String.capitalize/1)
 
               {:ok, capitalized}
             end),
@@ -164,7 +164,7 @@ defmodule Elixact.EnhancedFeaturesIntegrationTest do
       # Test string variant
       assert {:ok, "USER-1234"} = Validator.validate(id_type, "USER-1234")
 
-      # Test integer variant  
+      # Test integer variant
       assert {:ok, 5000} = Validator.validate(id_type, 5000)
 
       # Test atom variant

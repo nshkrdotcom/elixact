@@ -421,8 +421,7 @@ defmodule Elixact.ConfigTest do
         field
         |> Atom.to_string()
         |> String.split("_")
-        |> Enum.map(&String.capitalize/1)
-        |> Enum.join(" ")
+        |> Enum.map_join(" ", &String.capitalize/1)
       end
 
       desc_fn = fn field -> "Generated description for #{field}" end

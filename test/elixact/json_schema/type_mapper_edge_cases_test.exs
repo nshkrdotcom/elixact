@@ -1,7 +1,7 @@
 defmodule Elixact.JsonSchema.TypeMapperEdgeCasesTest do
   use ExUnit.Case, async: true
-  alias Elixact.JsonSchema.TypeMapper
   alias Elixact.JsonSchema.ReferenceStore
+  alias Elixact.JsonSchema.TypeMapper
   alias Elixact.Types
 
   describe "TypeMapper edge cases" do

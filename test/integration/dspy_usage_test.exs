@@ -391,7 +391,7 @@ defmodule Elixact.DSPyUsageTest do
             ),
           outputs:
             Types.map(
-              # field name  
+              # field name
               Types.string(),
               Types.object(%{
                 desc: Types.string(),

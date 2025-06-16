@@ -7,7 +7,7 @@ defmodule Elixact.EnhancedValidator do
   support.
   """
 
-  alias Elixact.{Runtime, TypeAdapter, Config, Wrapper, JsonSchema}
+  alias Elixact.{Config, JsonSchema, Runtime, TypeAdapter, Wrapper}
   alias Elixact.Runtime.DynamicSchema
 
   @type validation_input :: map() | term()
@@ -167,7 +167,7 @@ defmodule Elixact.EnhancedValidator do
           {:ok, [term()]} | {:error, %{integer() => [Elixact.Error.t()]}}
   def validate_many(target, inputs, opts \\ []) when is_list(inputs) do
     # For type specifications, use TypeAdapter for efficiency
-    if is_type_spec?(target) do
+    if type_spec?(target) do
       config = Keyword.get(opts, :config, Config.create())
       type_adapter_opts = Config.to_validation_opts(config)
 
@@ -338,10 +338,7 @@ defmodule Elixact.EnhancedValidator do
     path = Keyword.get(validation_opts, :path, [])
 
     # Handle nil or non-map input
-    if not is_map(input) do
-      error = Elixact.Error.new(path, :type, "expected a map, got: #{inspect(input)}")
-      {:error, [error]}
-    else
+    if is_map(input) do
       # Validate each field with coercion using TypeAdapter
       result =
         Enum.reduce_while(schema.fields, {:ok, %{}}, fn {field_name, field_meta}, {:ok, acc} ->
@@ -388,6 +385,9 @@ defmodule Elixact.EnhancedValidator do
         {:error, errors} ->
           {:error, errors}
       end
+    else
+      error = Elixact.Error.new(path, :type, "expected a map, got: #{inspect(input)}")
+      {:error, [error]}
     end
   end
 
@@ -501,14 +501,14 @@ defmodule Elixact.EnhancedValidator do
     TypeAdapter.json_schema(type_spec, json_schema_opts)
   end
 
-  @spec is_type_spec?(term()) :: boolean()
-  defp is_type_spec?(%DynamicSchema{}), do: false
+  @spec type_spec?(term()) :: boolean()
+  defp type_spec?(%DynamicSchema{}), do: false
 
-  defp is_type_spec?(atom) when is_atom(atom) do
+  defp type_spec?(atom) when is_atom(atom) do
     not (Code.ensure_loaded?(atom) and function_exported?(atom, :__schema__, 1))
   end
 
-  defp is_type_spec?(_), do: true
+  defp type_spec?(_), do: true
 
   @doc """
   Creates a comprehensive validation report for debugging purposes.

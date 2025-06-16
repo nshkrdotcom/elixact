@@ -8,6 +8,7 @@ defmodule Elixact.Runtime do
 
   alias Elixact.Runtime.DynamicSchema
   alias Elixact.{FieldMeta, Validator}
+  alias Elixact.JsonSchema.{ReferenceStore, TypeMapper}
 
   @type field_definition :: {atom(), type_spec()} | {atom(), type_spec(), keyword()}
   @type type_spec :: Elixact.Types.type_definition() | atom() | module()
@@ -123,7 +124,7 @@ defmodule Elixact.Runtime do
   """
   @spec to_json_schema(DynamicSchema.t(), keyword()) :: map()
   def to_json_schema(%DynamicSchema{} = schema, opts \\ []) do
-    {:ok, store} = Elixact.JsonSchema.ReferenceStore.start_link()
+    {:ok, store} = ReferenceStore.start_link()
 
     try do
       base_schema =
@@ -147,7 +148,7 @@ defmodule Elixact.Runtime do
           properties = Map.get(acc, "properties", %{})
 
           field_schema =
-            Elixact.JsonSchema.TypeMapper.to_json_schema(field_meta.type, store)
+            TypeMapper.to_json_schema(field_meta.type, store)
             |> Map.merge(convert_field_metadata(field_meta))
             |> Map.reject(fn {_, v} -> is_nil(v) end)
 
@@ -164,7 +165,7 @@ defmodule Elixact.Runtime do
         end)
 
       # Add definitions if any references were created
-      definitions = Elixact.JsonSchema.ReferenceStore.get_definitions(store)
+      definitions = ReferenceStore.get_definitions(store)
 
       if map_size(definitions) > 0 do
         Map.put(schema_with_fields, "definitions", definitions)
@@ -172,7 +173,7 @@ defmodule Elixact.Runtime do
         schema_with_fields
       end
     after
-      Elixact.JsonSchema.ReferenceStore.stop(store)
+      ReferenceStore.stop(store)
     end
   end
 

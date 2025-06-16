@@ -1,6 +1,6 @@
 defmodule Elixact.ValidatorEdgeCasesTest do
   use ExUnit.Case, async: true
-  alias Elixact.{Validator, Types}
+  alias Elixact.{Types, Validator}
 
   describe "constraint validation edge cases" do
     test "handles regex constraint with special characters" do
