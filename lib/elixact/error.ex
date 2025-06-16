@@ -3,13 +3,14 @@ defmodule Elixact.Error do
   Structured error representation for Elixact validation errors.
   """
 
+  @enforce_keys [:path, :code, :message]
+  defstruct [:path, :code, :message]
+
   @type t :: %__MODULE__{
           path: [atom() | String.t()],
           code: atom(),
           message: String.t()
         }
-
-  defstruct [:path, :code, :message]
 
   @doc """
   Creates a new validation error.

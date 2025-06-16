@@ -6,12 +6,12 @@ defmodule Elixact.ValidationError do
   and validation fails, providing detailed error information.
   """
 
+  @enforce_keys [:errors]
+  defexception [:errors]
+
   @type t :: %__MODULE__{
           errors: [Elixact.Error.t()]
         }
-
-  @enforce_keys [:errors]
-  defexception [:errors]
 
   @impl true
   @doc """

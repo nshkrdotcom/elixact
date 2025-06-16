@@ -7,7 +7,6 @@ defmodule Elixact.Config do
   modification like `ConfigDict(extra="forbid", frozen=True)`.
   """
 
-  @enforce_keys []
   defstruct [
     # Enforce strict validation (no extra fields)
     strict: false,
@@ -76,10 +75,12 @@ defmodule Elixact.Config do
   ## Examples
 
       iex> config = Elixact.Config.create(strict: true, extra: :forbid)
-      %Elixact.Config{strict: true, extra: :forbid, ...}
+      iex> config.strict
+      true
 
       iex> config = Elixact.Config.create(%{coercion: :aggressive, frozen: true})
-      %Elixact.Config{coercion: :aggressive, frozen: true, ...}
+      iex> config.coercion
+      :aggressive
   """
   @spec create(keyword() | map()) :: t()
   def create(opts \\ []) do
@@ -493,56 +494,81 @@ defmodule Elixact.Config do
 
   @spec validate_option_values!(map()) :: :ok
   defp validate_option_values!(opts_map) do
-    Enum.each(opts_map, fn {key, value} ->
-      case key do
-        :strict ->
-          unless is_boolean(value), do: raise(ArgumentError, "strict must be a boolean")
+    Enum.each(opts_map, &validate_single_option/1)
+  end
 
-        :extra ->
-          unless value in [:allow, :forbid, :ignore],
-            do: raise(ArgumentError, "extra must be :allow, :forbid, or :ignore")
+  @spec validate_single_option({atom(), term()}) :: :ok
+  defp validate_single_option({key, value}) do
+    case key do
+      k
+      when k in [
+             :strict,
+             :frozen,
+             :validate_assignment,
+             :use_enum_values,
+             :allow_population_by_field_name,
+             :case_sensitive
+           ] ->
+        validate_boolean_option(value, Atom.to_string(k))
 
-        :coercion ->
-          unless value in [:none, :safe, :aggressive],
-            do: raise(ArgumentError, "coercion must be :none, :safe, or :aggressive")
+      :extra ->
+        validate_extra_option(value)
 
-        :frozen ->
-          unless is_boolean(value), do: raise(ArgumentError, "frozen must be a boolean")
+      :coercion ->
+        validate_coercion_option(value)
 
-        :validate_assignment ->
-          unless is_boolean(value),
-            do: raise(ArgumentError, "validate_assignment must be a boolean")
+      :error_format ->
+        validate_error_format_option(value)
 
-        :use_enum_values ->
-          unless is_boolean(value), do: raise(ArgumentError, "use_enum_values must be a boolean")
+      :max_anyof_union_len ->
+        validate_integer_option(value, "max_anyof_union_len")
 
-        :allow_population_by_field_name ->
-          unless is_boolean(value),
-            do: raise(ArgumentError, "allow_population_by_field_name must be a boolean")
+      k when k in [:title_generator, :description_generator] ->
+        validate_function_option(value, Atom.to_string(k))
 
-        :case_sensitive ->
-          unless is_boolean(value), do: raise(ArgumentError, "case_sensitive must be a boolean")
+      _ ->
+        :ok
+    end
+  end
 
-        :error_format ->
-          unless value in [:detailed, :simple, :minimal],
-            do: raise(ArgumentError, "error_format must be :detailed, :simple, or :minimal")
+  defp validate_boolean_option(value, field_name) do
+    unless is_boolean(value), do: raise(ArgumentError, "#{field_name} must be a boolean")
+    :ok
+  end
 
-        :max_anyof_union_len ->
-          unless is_integer(value),
-            do: raise(ArgumentError, "max_anyof_union_len must be an integer")
+  defp validate_extra_option(value) do
+    unless value in [:allow, :forbid, :ignore],
+      do: raise(ArgumentError, "extra must be :allow, :forbid, or :ignore")
 
-        :title_generator ->
-          unless is_nil(value) or is_function(value, 1),
-            do: raise(ArgumentError, "title_generator must be a function or nil")
+    :ok
+  end
 
-        :description_generator ->
-          unless is_nil(value) or is_function(value, 1),
-            do: raise(ArgumentError, "description_generator must be a function or nil")
+  defp validate_coercion_option(value) do
+    unless value in [:none, :safe, :aggressive],
+      do: raise(ArgumentError, "coercion must be :none, :safe, or :aggressive")
 
-        _ ->
-          :ok
-      end
-    end)
+    :ok
+  end
+
+  defp validate_error_format_option(value) do
+    unless value in [:detailed, :simple, :minimal],
+      do: raise(ArgumentError, "error_format must be :detailed, :simple, or :minimal")
+
+    :ok
+  end
+
+  defp validate_integer_option(value, field_name) do
+    unless is_integer(value),
+      do: raise(ArgumentError, "#{field_name} must be an integer")
+
+    :ok
+  end
+
+  defp validate_function_option(value, field_name) do
+    unless is_nil(value) or is_function(value, 1),
+      do: raise(ArgumentError, "#{field_name} must be a function or nil")
+
+    :ok
   end
 
   @spec enabled_features(t()) :: [String.t()]

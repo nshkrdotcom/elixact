@@ -340,40 +340,7 @@ defmodule Elixact.EnhancedValidator do
     # Handle nil or non-map input
     if is_map(input) do
       # Validate each field with coercion using TypeAdapter
-      result =
-        Enum.reduce_while(schema.fields, {:ok, %{}}, fn {field_name, field_meta}, {:ok, acc} ->
-          field_path = path ++ [field_name]
-
-          # Get field value from input (supporting both atom and string keys)
-          field_value = Map.get(input, field_name) || Map.get(input, Atom.to_string(field_name))
-
-          case {field_value, field_meta} do
-            {nil, %Elixact.FieldMeta{default: default}} when not is_nil(default) ->
-              # Use default value
-              {:cont, {:ok, Map.put(acc, field_name, default)}}
-
-            {nil, %Elixact.FieldMeta{required: false}} ->
-              # Optional field without value
-              {:cont, {:ok, acc}}
-
-            {nil, %Elixact.FieldMeta{required: true}} ->
-              # Required field missing
-              error = Elixact.Error.new(field_path, :required, "field is required")
-              {:halt, {:error, [error]}}
-
-            {value, _} ->
-              # Validate field with coercion
-              case TypeAdapter.validate(field_meta.type, value, coerce: true, path: field_path) do
-                {:ok, validated_value} ->
-                  {:cont, {:ok, Map.put(acc, field_name, validated_value)}}
-
-                {:error, errors} ->
-                  {:halt, {:error, errors}}
-              end
-          end
-        end)
-
-      case result do
+      case validate_schema_fields_with_coercion(schema.fields, input, path) do
         {:ok, validated_fields} ->
           # Check for extra fields if strict mode is enabled
           if Keyword.get(validation_opts, :strict, false) do
@@ -388,6 +355,57 @@ defmodule Elixact.EnhancedValidator do
     else
       error = Elixact.Error.new(path, :type, "expected a map, got: #{inspect(input)}")
       {:error, [error]}
+    end
+  end
+
+  @spec validate_schema_fields_with_coercion(map(), map(), [atom()]) ::
+          {:ok, map()} | {:error, [Elixact.Error.t()]}
+  defp validate_schema_fields_with_coercion(fields, input, path) do
+    Enum.reduce_while(fields, {:ok, %{}}, fn {field_name, field_meta}, {:ok, acc} ->
+      field_path = path ++ [field_name]
+
+      # Get field value from input (supporting both atom and string keys)
+      field_value = Map.get(input, field_name) || Map.get(input, Atom.to_string(field_name))
+
+      case validate_single_field_with_coercion(field_value, field_meta, field_path) do
+        {:ok, validated_value} ->
+          {:cont, {:ok, Map.put(acc, field_name, validated_value)}}
+
+        {:skip} ->
+          {:cont, {:ok, acc}}
+
+        {:error, errors} ->
+          {:halt, {:error, errors}}
+      end
+    end)
+  end
+
+  @spec validate_single_field_with_coercion(term(), Elixact.FieldMeta.t(), [atom()]) ::
+          {:ok, term()} | {:skip} | {:error, [Elixact.Error.t()]}
+  defp validate_single_field_with_coercion(field_value, field_meta, field_path) do
+    case {field_value, field_meta} do
+      {nil, %Elixact.FieldMeta{default: default}} when not is_nil(default) ->
+        # Use default value
+        {:ok, default}
+
+      {nil, %Elixact.FieldMeta{required: false}} ->
+        # Optional field without value
+        {:skip}
+
+      {nil, %Elixact.FieldMeta{required: true}} ->
+        # Required field missing
+        error = Elixact.Error.new(field_path, :required, "field is required")
+        {:error, [error]}
+
+      {value, _} ->
+        # Validate field with coercion
+        case TypeAdapter.validate(field_meta.type, value, coerce: true, path: field_path) do
+          {:ok, validated_value} ->
+            {:ok, validated_value}
+
+          {:error, errors} ->
+            {:error, errors}
+        end
     end
   end
 
