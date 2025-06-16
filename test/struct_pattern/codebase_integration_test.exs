@@ -61,8 +61,8 @@ defmodule Elixact.CodebaseIntegrationTest do
       input = %{data: "test"}
 
       # Enhanced validator should handle struct schemas
-      # But since EnhancedValidator doesn't know about struct creation, 
-      # we should test that it doesn't break struct validation
+      # But since EnhancedValidator doesn't know about struct creation,
+
       assert {:ok, result} = EnhancedStructSchema.validate(input)
       assert is_struct(result, EnhancedStructSchema)
 

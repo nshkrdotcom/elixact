@@ -99,34 +99,32 @@ defmodule Elixact.StructValidator do
   @spec create_struct_instance(module(), map(), [atom() | String.t() | integer()]) ::
           {:ok, struct()} | {:error, [Error.t()]}
   defp create_struct_instance(schema_module, validated_map, path) do
-    try do
-      # Use struct!/2 to create the struct instance
-      # This should always succeed if our field extraction logic is correct
-      validated_struct = struct!(schema_module, validated_map)
-      {:ok, validated_struct}
-    rescue
-      e in ArgumentError ->
-        # This should be extremely rare and indicates a bug in our implementation
-        # Log the error for debugging while providing a helpful error message
-        error_message = """
-        Failed to create struct #{inspect(schema_module)} from validated data.
-        This indicates a mismatch between struct fields and validation output.
+    # Use struct!/2 to create the struct instance
+    # This should always succeed if our field extraction logic is correct
+    validated_struct = struct!(schema_module, validated_map)
+    {:ok, validated_struct}
+  rescue
+    e in ArgumentError ->
+      # This should be extremely rare and indicates a bug in our implementation
+      # Log the error for debugging while providing a helpful error message
+      error_message = """
+      Failed to create struct #{inspect(schema_module)} from validated data.
+      This indicates a mismatch between struct fields and validation output.
 
-        Struct fields: #{inspect(get_struct_fields(schema_module))}
-        Validated data keys: #{inspect(Map.keys(validated_map))}
+      Struct fields: #{inspect(get_struct_fields(schema_module))}
+      Validated data keys: #{inspect(Map.keys(validated_map))}
 
-        Original error: #{Exception.message(e)}
-        """
+      Original error: #{Exception.message(e)}
+      """
 
-        error = Error.new(path, :struct_creation, String.trim(error_message))
-        {:error, [error]}
+      error = Error.new(path, :struct_creation, String.trim(error_message))
+      {:error, [error]}
 
-      e ->
-        # Handle any other unexpected errors during struct creation
-        error_message = "Unexpected error creating struct: #{Exception.message(e)}"
-        error = Error.new(path, :struct_creation, error_message)
-        {:error, [error]}
-    end
+    e ->
+      # Handle any other unexpected errors during struct creation
+      error_message = "Unexpected error creating struct: #{Exception.message(e)}"
+      error = Error.new(path, :struct_creation, error_message)
+      {:error, [error]}
   end
 
   # Get struct field names for debugging

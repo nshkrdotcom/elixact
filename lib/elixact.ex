@@ -94,7 +94,7 @@ defmodule Elixact do
         end
       end
 
-      # Struct-based validation  
+      # Struct-based validation
       defmodule UserStructSchema do
         use Elixact, define_struct: true
 
@@ -124,6 +124,7 @@ defmodule Elixact do
   end
 
   @spec __before_compile__(Macro.Env.t()) :: Macro.t()
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defmacro __before_compile__(env) do
     define_struct? = Module.get_attribute(env.module, :elixact_define_struct)
     fields = Module.get_attribute(env.module, :fields) || []
@@ -171,20 +172,18 @@ defmodule Elixact do
               {:ok, %{name: "John"}}
 
               iex> UserSchema.dump("invalid")
-              {:error, "Expected UserSchema struct or map, got: \\"invalid\\""}
+              {:error, "Expected UserSchema struct or map, got: \"invalid\""}
           """
           @spec dump(struct() | map()) :: {:ok, map()} | {:error, String.t()}
-          def dump(%__MODULE__{} = struct) do
-            {:ok, Map.from_struct(struct)}
-          end
+          def dump(value), do: do_dump(__MODULE__, value)
 
-          def dump(map) when is_map(map) do
-            {:ok, map}
-          end
+          defp do_dump(module, %mod{} = struct) when mod == module,
+            do: {:ok, Map.from_struct(struct)}
 
-          def dump(other) do
-            {:error, "Expected #{__MODULE__} struct or map, got: #{inspect(other)}"}
-          end
+          defp do_dump(_module, map) when is_map(map), do: {:ok, map}
+
+          defp do_dump(module, other),
+            do: {:error, "Expected #{module} struct or map, got: #{inspect(other)}"}
         end
       else
         quote do
@@ -222,7 +221,7 @@ defmodule Elixact do
           iex> UserMapSchema.validate(%{name: "John"})
           {:ok, %{name: "John"}}
 
-          # With define_struct: true  
+          # With define_struct: true
           iex> UserStructSchema.validate(%{name: "John"})
           {:ok, %UserStructSchema{name: "John"}}
       """
