@@ -296,38 +296,40 @@ defmodule Elixact.Runtime do
   defp validate_fields(fields, data, path) do
     {validated, errors} =
       Enum.reduce(fields, {%{}, []}, fn {name, meta}, {acc, errors_acc} ->
-        field_path = path ++ [name]
-        value = Map.get(data, name) || Map.get(data, Atom.to_string(name))
-
-        case {value, meta} do
-          {nil, %{default: default}} ->
-            {Map.put(acc, name, default), errors_acc}
-
-          {nil, %{required: false}} ->
-            {acc, errors_acc}
-
-          {nil, _} ->
-            error = Elixact.Error.new(field_path, :required, "field is required")
-            {acc, [error | errors_acc]}
-
-          {value, _} ->
-            case Validator.validate(meta.type, value, field_path) do
-              {:ok, validated_value} ->
-                {Map.put(acc, name, validated_value), errors_acc}
-
-              {:error, field_errors} when is_list(field_errors) ->
-                {acc, field_errors ++ errors_acc}
-
-              {:error, field_error} ->
-                {acc, [field_error | errors_acc]}
-            end
-        end
+        validate_single_field(name, meta, data, path, acc, errors_acc)
       end)
 
     case errors do
       [] -> {:ok, validated}
       _ -> {:error, Enum.reverse(errors)}
     end
+  end
+
+  defp validate_single_field(name, meta, data, path, acc, errors_acc) do
+    field_path = path ++ [name]
+    value = Map.get(data, name) || Map.get(data, Atom.to_string(name))
+
+    case handle_field_value(value, meta, field_path) do
+      {:ok, validated_value} ->
+        {Map.put(acc, name, validated_value), errors_acc}
+
+      {:error, field_errors} when is_list(field_errors) ->
+        {acc, field_errors ++ errors_acc}
+
+      {:error, field_error} ->
+        {acc, [field_error | errors_acc]}
+    end
+  end
+
+  defp handle_field_value(nil, %{default: default}, _field_path), do: {:ok, default}
+  defp handle_field_value(nil, %{required: false}, _field_path), do: {:skip, nil}
+
+  defp handle_field_value(nil, _meta, field_path) do
+    {:error, Elixact.Error.new(field_path, :required, "field is required")}
+  end
+
+  defp handle_field_value(value, meta, field_path) do
+    Validator.validate(meta.type, value, field_path)
   end
 
   @spec validate_strict_mode(map(), map(), map(), [atom()]) :: :ok | {:error, Elixact.Error.t()}
