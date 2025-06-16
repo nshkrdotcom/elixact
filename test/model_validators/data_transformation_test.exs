@@ -1,6 +1,6 @@
 defmodule Elixact.DataTransformationTest do
   use ExUnit.Case
-  alias Elixact.ModelValidatorTestSchemas.{DataTransformer, DataEnhancer}
+  alias Elixact.ModelValidatorTestSchemas.{DataEnhancer, DataTransformer}
 
   describe "data transformation in model validators" do
     test "model validator can transform data" do

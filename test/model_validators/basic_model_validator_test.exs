@@ -2,9 +2,9 @@ defmodule Elixact.BasicModelValidatorTest do
   use ExUnit.Case
 
   alias Elixact.ModelValidatorTestSchemas.{
-    PasswordValidationStruct,
+    NoValidators,
     PasswordValidationMap,
-    NoValidators
+    PasswordValidationStruct
   }
 
   describe "basic model validator functionality" do

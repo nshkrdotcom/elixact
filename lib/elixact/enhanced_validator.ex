@@ -132,18 +132,22 @@ defmodule Elixact.EnhancedValidator do
       |> Keyword.take([:required, :coerce])
       |> Keyword.merge(Keyword.take(opts, [:constraints, :required, :coerce]))
 
-    # Note: This function delegates to Wrapper.wrap_and_validate
-    # Type validation is handled during wrapper creation and validation
-    case Wrapper.wrap_and_validate(field_name, type_spec, input, wrapper_opts) do
-      {:ok, result} ->
-        {:ok, result}
+    try do
+      case Wrapper.wrap_and_validate(field_name, type_spec, input, wrapper_opts) do
+        {:ok, result} ->
+          {:ok, result}
 
-      {:error, errors} ->
-        {:error, errors}
+        {:error, errors} ->
+          {:error, errors}
 
-      other ->
+        other ->
+          {:error,
+           [Elixact.Error.new([], :validation_error, "unexpected result: #{inspect(other)}")]}
+      end
+    rescue
+      exception ->
         {:error,
-         [Elixact.Error.new([], :validation_error, "unexpected result: #{inspect(other)}")]}
+         [Elixact.Error.new([], :exception, Exception.format(:error, exception, __STACKTRACE__))]}
     end
   end
 

@@ -5,6 +5,9 @@ defmodule Elixact.ModelValidatorTestSchemas do
 
   # Basic model validator with struct
   defmodule PasswordValidationStruct do
+    @moduledoc """
+    Schema for password validation using a struct.
+    """
     use Elixact, define_struct: true
 
     schema "Password validation with struct" do
@@ -23,8 +26,11 @@ defmodule Elixact.ModelValidatorTestSchemas do
     end
   end
 
-  # Basic model validator with map  
+  # Basic model validator with map
   defmodule PasswordValidationMap do
+    @moduledoc """
+    Schema for password validation using a map.
+    """
     use Elixact, define_struct: false
 
     schema "Password validation with map" do
@@ -45,6 +51,9 @@ defmodule Elixact.ModelValidatorTestSchemas do
 
   # Multiple model validators
   defmodule MultipleValidators do
+    @moduledoc """
+    Schema with multiple model validators for username, email, and age.
+    """
     use Elixact, define_struct: true
 
     schema do
@@ -84,6 +93,9 @@ defmodule Elixact.ModelValidatorTestSchemas do
 
   # Model validator that transforms data
   defmodule DataTransformer do
+    @moduledoc """
+    Schema with a model validator that transforms and normalizes data.
+    """
     use Elixact, define_struct: true
 
     schema do
@@ -106,6 +118,9 @@ defmodule Elixact.ModelValidatorTestSchemas do
 
   # Model validator with complex business logic
   defmodule BusinessLogicValidator do
+    @moduledoc """
+    Schema with business logic validation for product pricing and discounts.
+    """
     use Elixact, define_struct: true
 
     schema do
@@ -155,6 +170,9 @@ defmodule Elixact.ModelValidatorTestSchemas do
 
   # Model validator that returns Error struct
   defmodule ErrorStructValidator do
+    @moduledoc """
+    Schema with a model validator that returns an Elixact.Error struct.
+    """
     use Elixact, define_struct: true
 
     schema do
@@ -175,6 +193,9 @@ defmodule Elixact.ModelValidatorTestSchemas do
 
   # Model validator that adds additional data
   defmodule DataEnhancer do
+    @moduledoc """
+    Schema with a model validator that adds additional data fields.
+    """
     use Elixact, define_struct: true
 
     schema do
@@ -193,6 +214,9 @@ defmodule Elixact.ModelValidatorTestSchemas do
 
   # Model validator with conditional logic
   defmodule ConditionalValidator do
+    @moduledoc """
+    Schema with conditional logic in the model validator.
+    """
     use Elixact, define_struct: true
 
     schema do
@@ -234,6 +258,9 @@ defmodule Elixact.ModelValidatorTestSchemas do
 
   # Model validator that works with optional fields
   defmodule OptionalFieldValidator do
+    @moduledoc """
+    Schema with optional fields and display logic validation.
+    """
     use Elixact, define_struct: true
 
     schema do
@@ -264,6 +291,9 @@ defmodule Elixact.ModelValidatorTestSchemas do
 
   # Schema without model validators (for compatibility testing)
   defmodule NoValidators do
+    @moduledoc """
+    Schema without model validators for compatibility testing.
+    """
     use Elixact, define_struct: true
 
     schema do
@@ -273,6 +303,9 @@ defmodule Elixact.ModelValidatorTestSchemas do
 
   # Model validator that fails during execution
   defmodule FailingValidator do
+    @moduledoc """
+    Schema with a model validator that intentionally fails for testing.
+    """
     use Elixact, define_struct: true
 
     schema do
