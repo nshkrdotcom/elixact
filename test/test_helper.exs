@@ -4,10 +4,23 @@ ExUnit.start()
 
 # Additional test configuration and helpers
 ExUnit.configure(
-  exclude: [:slow, :integration],
+  exclude: [:slow, :integration, :performance, :memory_profile],
   timeout: 30_000,
   max_failures: 10
 )
+
+# Add Stream data for property-based testing if available
+if Code.ensure_loaded?(StreamData) do
+  # Deterministic for property tests
+  ExUnit.configure(seed: 0)
+end
+
+if System.get_env("COVERAGE") do
+  ExUnit.configure(
+    include: [:performance, :integration],
+    formatters: [ExUnit.CLIFormatter, ExUnit.Formatter.HTML]
+  )
+end
 
 defmodule TestHelpers do
   @moduledoc """

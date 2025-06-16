@@ -46,40 +46,6 @@ defmodule Elixact.Schema do
       @schema_description unquote(description)
 
       unquote(block)
-
-      # Generate validation functions
-      @doc """
-      Validates data against this schema.
-
-      ## Parameters
-        * `data` - The data to validate (map)
-
-      ## Returns
-        * `{:ok, validated_data}` on success
-        * `{:error, errors}` on validation failure
-      """
-      @spec validate(map()) :: {:ok, map()} | {:error, [Elixact.Error.t()]}
-      def validate(data) do
-        Elixact.Validator.validate_schema(__MODULE__, data)
-      end
-
-      @doc """
-      Validates data against this schema, raising an exception on failure.
-
-      ## Parameters
-        * `data` - The data to validate (map)
-
-      ## Returns
-        * Validated data on success
-        * Raises `Elixact.ValidationError` on failure
-      """
-      @spec validate!(map()) :: map()
-      def validate!(data) do
-        case validate(data) do
-          {:ok, validated} -> validated
-          {:error, errors} -> raise Elixact.ValidationError, errors: errors
-        end
-      end
     end
   end
 
@@ -410,6 +376,63 @@ defmodule Elixact.Schema do
   defmacro field(name, type, opts \\ [do: {:__block__, [], []}])
 
   @spec field(atom(), term(), keyword()) :: Macro.t()
+  defmacro field(name, type, opts) when is_list(opts) do
+    # Handle the case where opts is a keyword list like [required: true, default: "value"]
+    do_block = Keyword.get(opts, :do, {:__block__, [], []})
+    opts_without_do = Keyword.delete(opts, :do)
+
+    # Extract common options
+    required = Keyword.get(opts_without_do, :required, true)
+    optional = Keyword.get(opts_without_do, :optional, false)
+    default_value = Keyword.get(opts_without_do, :default)
+
+    # Determine if field is required (required: true takes precedence over optional: true)
+    is_required =
+      if Keyword.has_key?(opts_without_do, :required) do
+        required
+      else
+        not optional
+      end
+
+    quote do
+      field_meta = %Elixact.FieldMeta{
+        name: unquote(name),
+        type: unquote(handle_type(type)),
+        required: unquote(is_required),
+        constraints: []
+      }
+
+      # Apply default if provided
+      field_meta =
+        if unquote(default_value) != nil do
+          Map.put(field_meta, :default, unquote(default_value))
+        else
+          field_meta
+        end
+
+      # Create a variable accessible across all nested macros in this field block
+      var!(field_meta) = field_meta
+
+      unquote(do_block)
+
+      # Apply constraints to the type
+      final_type =
+        case var!(field_meta).type do
+          {:type, type_name, _} ->
+            {:type, type_name, Enum.reverse(var!(field_meta).constraints)}
+
+          {kind, inner, _} ->
+            {kind, inner, Enum.reverse(var!(field_meta).constraints)}
+
+          other ->
+            other
+        end
+
+      final_meta = Map.put(var!(field_meta), :type, final_type)
+      @fields {unquote(name), final_meta}
+    end
+  end
+
   defmacro field(name, type, do: block) do
     quote do
       field_meta = %Elixact.FieldMeta{

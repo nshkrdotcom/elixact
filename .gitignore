@@ -31,3 +31,5 @@ elixact-*.tar
 .env
 
 repomix-output.xml
+
+/pydantic/
