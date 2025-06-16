@@ -1,7 +1,7 @@
 #!/usr/bin/env elixir
 
 # Wrapper Models Example
-# Run with: mix run examples/wrapper_models.exs
+# Run with: elixir examples/wrapper_models.exs
 
 Mix.install([{:elixact, path: "."}])
 
@@ -30,7 +30,7 @@ for score <- valid_scores do
   case Elixact.Wrapper.validate_and_extract(score_wrapper, score, :score) do
     {:ok, validated} ->
       IO.puts("✅ Score #{score} -> #{validated}")
-    {:error, errors} ->
+    {:error, _errors} ->
       IO.puts("❌ Score #{score} -> Error")
   end
 end
@@ -84,7 +84,7 @@ for {input, description} <- flexible_inputs do
   case Elixact.Wrapper.validate_flexible(age_wrapper, input, :age) do
     {:ok, validated} ->
       IO.puts("✅ #{description}: #{inspect(input)} -> #{validated}")
-    {:error, errors} ->
+    {:error, _errors} ->
       IO.puts("❌ #{description}: #{inspect(input)} -> Error")
   end
 end
@@ -173,7 +173,7 @@ tags_data = ["elixir", "programming", "web-development"]
 case Elixact.Wrapper.validate_and_extract(tags_wrapper, tags_data, :tags) do
   {:ok, validated} ->
     IO.puts("✅ Tags validated: #{inspect(validated)}")
-  {:error, errors} ->
+  {:error, _errors} ->
     IO.puts("❌ Tags validation failed")
 end
 
@@ -186,7 +186,7 @@ metadata = %{"version" => "1.0", "author" => "John", "settings" => %{"theme" => 
 case Elixact.Wrapper.validate_and_extract(metadata_wrapper, metadata, :metadata) do
   {:ok, validated} ->
     IO.puts("✅ Metadata validated: #{inspect(validated)}")
-  {:error, errors} ->
+  {:error, _errors} ->
     IO.puts("❌ Metadata validation failed")
 end
 
@@ -231,7 +231,7 @@ password_tests = [
 
 for password <- password_tests do
   case Elixact.Wrapper.validate_and_extract(strict_password_wrapper, password, :password) do
-    {:ok, validated} ->
+    {:ok, _validated} ->
       IO.puts("✅ Password '#{password}' accepted")
     {:error, errors} ->
       IO.puts("❌ Password '#{password}' rejected:")

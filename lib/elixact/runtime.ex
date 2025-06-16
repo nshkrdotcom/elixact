@@ -86,10 +86,13 @@ defmodule Elixact.Runtime do
           {:ok, map()} | {:error, [Elixact.Error.t()]}
   def validate(data, %DynamicSchema{} = schema, opts \\ []) do
     path = Keyword.get(opts, :path, [])
+    # Runtime opts override schema config
+    runtime_strict = Keyword.get(opts, :strict, schema.config[:strict])
+    config = Map.put(schema.config, :strict, runtime_strict)
 
     with :ok <- validate_required_fields(schema.fields, data, path),
          {:ok, validated} <- validate_fields(schema.fields, data, path),
-         :ok <- validate_strict_mode(schema.config, validated, data, path) do
+         :ok <- validate_strict_mode(config, validated, data, path) do
       {:ok, validated}
     else
       {:error, errors} when is_list(errors) ->
@@ -290,27 +293,40 @@ defmodule Elixact.Runtime do
   @spec validate_fields(map(), map(), [atom()]) ::
           {:ok, map()} | {:error, Elixact.Error.t() | [Elixact.Error.t()]}
   defp validate_fields(fields, data, path) do
-    Enum.reduce_while(fields, {:ok, %{}}, fn {name, meta}, {:ok, acc} ->
-      field_path = path ++ [name]
-      value = Map.get(data, name) || Map.get(data, Atom.to_string(name))
+    {validated, errors} =
+      Enum.reduce(fields, {%{}, []}, fn {name, meta}, {acc, errors_acc} ->
+        field_path = path ++ [name]
+        value = Map.get(data, name) || Map.get(data, Atom.to_string(name))
 
-      case {value, meta} do
-        {nil, %{default: default}} ->
-          {:cont, {:ok, Map.put(acc, name, default)}}
+        case {value, meta} do
+          {nil, %{default: default}} ->
+            {Map.put(acc, name, default), errors_acc}
 
-        {nil, %{required: false}} ->
-          {:cont, {:ok, acc}}
+          {nil, %{required: false}} ->
+            {acc, errors_acc}
 
-        {nil, _} ->
-          {:halt, {:error, Elixact.Error.new(field_path, :required, "field is required")}}
+          {nil, _} ->
+            error = Elixact.Error.new(field_path, :required, "field is required")
+            {acc, [error | errors_acc]}
 
-        {value, _} ->
-          case Validator.validate(meta.type, value, field_path) do
-            {:ok, validated} -> {:cont, {:ok, Map.put(acc, name, validated)}}
-            {:error, errors} -> {:halt, {:error, errors}}
-          end
-      end
-    end)
+          {value, _} ->
+            case Validator.validate(meta.type, value, field_path) do
+              {:ok, validated_value} ->
+                {Map.put(acc, name, validated_value), errors_acc}
+
+              {:error, field_errors} when is_list(field_errors) ->
+                {acc, field_errors ++ errors_acc}
+
+              {:error, field_error} ->
+                {acc, [field_error | errors_acc]}
+            end
+        end
+      end)
+
+    case errors do
+      [] -> {:ok, validated}
+      _ -> {:error, Enum.reverse(errors)}
+    end
   end
 
   @spec validate_strict_mode(map(), map(), map(), [atom()]) :: :ok | {:error, Elixact.Error.t()}

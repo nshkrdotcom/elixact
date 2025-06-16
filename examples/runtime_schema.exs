@@ -2,7 +2,7 @@
 #!/usr/bin/env elixir
 
 # Runtime Schema Generation Example
-# Run with: mix run examples/runtime_schema.exs
+# Run with: elixir examples/runtime_schema.exs
 
 Mix.install([{:elixact, path: "."}])
 
@@ -67,7 +67,7 @@ invalid_user = %{
 }
 
 case Elixact.Runtime.validate(invalid_user, user_schema) do
-  {:ok, validated} ->
+  {:ok, _validated} ->
     IO.puts("✅ Unexpected success")
   {:error, errors} ->
     IO.puts("❌ Expected validation errors:")
@@ -85,14 +85,14 @@ address_fields = [
   {:country, :string, [default: "USA"]}
 ]
 
-address_schema = Elixact.Runtime.create_schema(address_fields,
+_address_schema = Elixact.Runtime.create_schema(address_fields,
   title: "Address Schema"
 )
 
 # Create a person schema with nested address
 person_fields = [
   {:name, :string, [required: true]},
-  {:address, {:map, {:string, :any}}, [required: true]},  # Would be validated separately
+  {:address, {:map, {:any, :any}}, [required: true]},  # Would be validated separately
   {:contacts, {:array, {:map, {:string, :string}}}, [required: false]}
 ]
 
@@ -202,7 +202,7 @@ test_data = %{
 # Lenient validation (allows extra fields)
 IO.puts("Lenient validation (allows extra fields):")
 case Elixact.Runtime.validate(test_data, user_schema, strict: false) do
-  {:ok, validated} ->
+  {:ok, _validated} ->
     IO.puts("✅ Accepted with extra fields")
   {:error, errors} ->
     IO.puts("❌ Rejected: #{inspect(errors)}")
@@ -211,7 +211,7 @@ end
 # Strict validation (rejects extra fields)
 IO.puts("Strict validation (rejects extra fields):")
 case Elixact.Runtime.validate(test_data, user_schema, strict: true) do
-  {:ok, validated} ->
+  {:ok, _validated} ->
     IO.puts("✅ Unexpected acceptance")
   {:error, errors} ->
     IO.puts("❌ Expected rejection:")

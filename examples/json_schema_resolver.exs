@@ -1,7 +1,7 @@
 #!/usr/bin/env elixir
 
 # JSON Schema Resolver Example
-# Run with: mix run examples/json_schema_resolver.exs
+# Run with: elixir examples/json_schema_resolver.exs
 
 Mix.install([{:elixact, path: "."}])
 
@@ -354,7 +354,7 @@ empty_result = Elixact.JsonSchema.Resolver.resolve_references(empty_schema)
 IO.puts("✅ Empty schema handled: #{inspect(empty_result)}")
 
 # Test provider optimization with unknown provider
-generic_result = Elixact.JsonSchema.Resolver.enforce_structured_output(base_json_schema, provider: :unknown)
+_generic_result = Elixact.JsonSchema.Resolver.enforce_structured_output(base_json_schema, provider: :unknown)
 IO.puts("✅ Unknown provider handled gracefully")
 
 # Example 11: Performance Benchmarking

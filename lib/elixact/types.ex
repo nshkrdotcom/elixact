@@ -226,6 +226,7 @@ defmodule Elixact.Types do
   @spec coerce(atom(), term()) :: {:ok, term()} | {:error, String.t()}
   def coerce(:string, value) when is_integer(value), do: {:ok, Integer.to_string(value)}
   def coerce(:string, value) when is_float(value), do: {:ok, Float.to_string(value)}
+  def coerce(:string, value) when is_atom(value), do: {:ok, Atom.to_string(value)}
 
   def coerce(:integer, value) when is_binary(value) do
     case Integer.parse(value) do

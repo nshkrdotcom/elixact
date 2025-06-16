@@ -1,7 +1,7 @@
 #!/usr/bin/env elixir
 
 # TypeAdapter System Example
-# Run with: mix run examples/type_adapter.exs
+# Run with: elixir examples/type_adapter.exs
 
 Mix.install([{:elixact, path: "."}])
 
@@ -29,8 +29,8 @@ for {type, value, description} <- basic_tests do
   case Elixact.TypeAdapter.validate(type, value) do
     {:ok, validated} ->
       IO.puts("✅ #{description}: #{inspect(validated)}")
-    {:error, errors} ->
-      IO.puts("❌ #{description}: #{inspect(errors)}")
+    {:error, _errors} ->
+      IO.puts("❌ #{description}: Error")
   end
 end
 
@@ -48,7 +48,7 @@ for {type, value, description} <- coercion_tests do
   case Elixact.TypeAdapter.validate(type, value, coerce: true) do
     {:ok, validated} ->
       IO.puts("✅ #{description}: #{inspect(value)} -> #{inspect(validated)}")
-    {:error, errors} ->
+    {:error, _errors} ->
       IO.puts("❌ #{description}: #{inspect(value)} -> Error")
   end
 end
@@ -61,16 +61,16 @@ array_data = ["apple", "banana", "cherry"]
 case Elixact.TypeAdapter.validate({:array, :string}, array_data) do
   {:ok, validated} ->
     IO.puts("✅ Array of strings: #{inspect(validated)}")
-  {:error, errors} ->
+  {:error, _errors} ->
     IO.puts("❌ Array validation failed")
 end
 
 # Map validation
-map_data = %{"name" => "John", "age" => 30}
+_map_data = %{"name" => "John", "age" => 30}
 case Elixact.TypeAdapter.validate({:map, {:string, :integer}}, %{"age" => 30}) do
   {:ok, validated} ->
     IO.puts("✅ Map validation: #{inspect(validated)}")
-  {:error, errors} ->
+  {:error, _errors} ->
     IO.puts("❌ Map validation failed")
 end
 
@@ -81,7 +81,7 @@ mixed_type = {:map, {:string, {:union, [:string, :integer, {:array, :string}]}}}
 case Elixact.TypeAdapter.validate(mixed_type, mixed_map) do
   {:ok, validated} ->
     IO.puts("✅ Mixed map validation: #{inspect(validated)}")
-  {:error, errors} ->
+  {:error, _errors} ->
     IO.puts("❌ Mixed map validation failed")
 end
 
@@ -95,7 +95,7 @@ for value <- union_tests do
   case Elixact.TypeAdapter.validate(union_type, value) do
     {:ok, validated} ->
       IO.puts("✅ Union accepts #{inspect(value)}: #{inspect(validated)}")
-    {:error, errors} ->
+    {:error, _errors} ->
       IO.puts("❌ Union rejects #{inspect(value)}")
   end
 end
@@ -124,7 +124,7 @@ IO.puts("\n♻️ Example 6: Reusable TypeAdapter Instances")
 
 # Create reusable adapters for common types
 string_array_adapter = Elixact.TypeAdapter.create({:array, :string}, coerce: true)
-user_data_adapter = Elixact.TypeAdapter.create({:map, {:string, :any}})
+_user_data_adapter = Elixact.TypeAdapter.create({:map, {:string, :any}})
 
 # Test data
 test_arrays = [
@@ -138,7 +138,7 @@ for array <- test_arrays do
   case Elixact.TypeAdapter.Instance.validate(string_array_adapter, array) do
     {:ok, validated} ->
       IO.puts("✅ #{inspect(array)} -> #{inspect(validated)}")
-    {:error, errors} ->
+    {:error, _errors} ->
       IO.puts("❌ #{inspect(array)} -> Error")
   end
 end
@@ -155,7 +155,7 @@ case Elixact.TypeAdapter.Instance.validate_many(email_adapter, emails) do
     IO.puts("✅ All emails valid: #{inspect(validated_emails)}")
   {:error, error_map} ->
     IO.puts("❌ Some emails invalid:")
-    for {index, errors} <- error_map do
+    for {index, _errors} <- error_map do
       IO.puts("   Email #{index}: #{inspect(Enum.at(emails, index))} -> Error")
     end
 end
@@ -254,7 +254,7 @@ problematic_data = [
 
 for {data, description} <- problematic_data do
   case Elixact.TypeAdapter.validate(:string, data) do
-    {:ok, validated} ->
+    {:ok, _validated} ->
       IO.puts("✅ #{description}: Unexpected success")
     {:error, [error]} ->
       IO.puts("❌ #{description}: #{error.message}")

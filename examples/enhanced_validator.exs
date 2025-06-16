@@ -1,7 +1,7 @@
 #!/usr/bin/env elixir
 
 # Enhanced Validator Example
-# Run with: mix run examples/enhanced_validator.exs
+# Run with: elixir examples/enhanced_validator.exs
 
 Mix.install([{:elixact, path: "."}])
 
@@ -57,7 +57,7 @@ case Elixact.EnhancedValidator.validate(UserSchema, user_data) do
   {:ok, validated} ->
     IO.puts("✅ Compiled schema validation succeeded:")
     IO.inspect(validated, pretty: true)
-  {:error, errors} ->
+  {:error, _errors} ->
     IO.puts("❌ Compiled schema validation failed")
 end
 
@@ -79,7 +79,7 @@ case Elixact.EnhancedValidator.validate(runtime_schema, product_data) do
   {:ok, validated} ->
     IO.puts("✅ Runtime schema validation succeeded:")
     IO.inspect(validated, pretty: true)
-  {:error, errors} ->
+  {:error, _errors} ->
     IO.puts("❌ Runtime schema validation failed")
 end
 
@@ -91,7 +91,7 @@ case Elixact.EnhancedValidator.validate(type_spec, type_data) do
   {:ok, validated} ->
     IO.puts("✅ Type specification validation succeeded:")
     IO.inspect(validated, pretty: true)
-  {:error, errors} ->
+  {:error, _errors} ->
     IO.puts("❌ Type specification validation failed")
 end
 
@@ -122,7 +122,7 @@ lenient_config = Elixact.Config.create(%{
 # Test with strict configuration
 IO.puts("Testing with strict configuration:")
 case Elixact.EnhancedValidator.validate(UserSchema, test_data, config: strict_config) do
-  {:ok, validated} ->
+  {:ok, _validated} ->
     IO.puts("✅ Strict validation passed (unexpected)")
   {:error, errors} ->
     IO.puts("❌ Strict validation rejected extra field (expected):")
@@ -135,7 +135,7 @@ case Elixact.EnhancedValidator.validate(UserSchema, test_data, config: lenient_c
   {:ok, validated} ->
     IO.puts("✅ Lenient validation passed:")
     IO.inspect(validated, pretty: true)
-  {:error, errors} ->
+  {:error, _errors} ->
     IO.puts("❌ Lenient validation failed")
 end
 
@@ -156,7 +156,7 @@ for {field, type, value} <- coercion_tests do
   case Elixact.EnhancedValidator.validate_wrapped(field, type, value, config: coercion_config) do
     {:ok, validated} ->
       IO.puts("✅ #{field}: #{inspect(value)} -> #{inspect(validated)}")
-    {:error, errors} ->
+    {:error, _errors} ->
       IO.puts("❌ #{field}: #{inspect(value)} -> Error")
   end
 end
@@ -202,7 +202,7 @@ case Elixact.EnhancedValidator.validate_with_schema(api_schema, api_request) do
     IO.inspect(validated_data, pretty: true)
     IO.puts("Generated JSON Schema:")
     IO.puts(Jason.encode!(json_schema, pretty: true))
-  {:error, errors} ->
+  {:error, _errors} ->
     IO.puts("❌ API request validation failed")
 end
 
@@ -224,20 +224,20 @@ llm_response = %{
 
 # Optimize for OpenAI
 case Elixact.EnhancedValidator.validate_for_llm(llm_schema, llm_response, :openai) do
-  {:ok, validated, openai_schema} ->
+  {:ok, _validated, openai_schema} ->
     IO.puts("✅ OpenAI-optimized validation succeeded")
     IO.puts("OpenAI schema constraints:")
     IO.puts("   additionalProperties: #{openai_schema["additionalProperties"]}")
-  {:error, errors} ->
+  {:error, _errors} ->
     IO.puts("❌ OpenAI validation failed")
 end
 
 # Optimize for Anthropic
 case Elixact.EnhancedValidator.validate_for_llm(llm_schema, llm_response, :anthropic) do
-  {:ok, validated, anthropic_schema} ->
+  {:ok, _validated, anthropic_schema} ->
     IO.puts("✅ Anthropic-optimized validation succeeded")
     IO.puts("Anthropic schema has required array: #{Map.has_key?(anthropic_schema, "required")}")
-  {:error, errors} ->
+  {:error, _errors} ->
     IO.puts("❌ Anthropic validation failed")
 end
 
@@ -264,7 +264,7 @@ for input <- pipeline_inputs do
   case Elixact.EnhancedValidator.pipeline(text_processing_pipeline, input) do
     {:ok, result} ->
       IO.puts("✅ Pipeline: #{inspect(input)} -> #{inspect(result)}")
-    {:error, {step_index, errors}} ->
+    {:error, {step_index, _errors}} ->
       IO.puts("❌ Pipeline failed at step #{step_index}: #{inspect(input)}")
   end
 end
@@ -317,13 +317,13 @@ recovery_config = Elixact.Config.create(error_format: :detailed)
 validated_users = []
 failed_users = []
 
-for (user_data, index) <- Enum.with_index(unreliable_data) do
+for {user_data, index} <- Enum.with_index(unreliable_data) do
   case Elixact.EnhancedValidator.validate(UserSchema, user_data, config: recovery_config) do
     {:ok, validated} ->
-      validated_users = [validated | validated_users]
+      _validated_users = [validated | validated_users]
       IO.puts("✅ User #{index}: Validated successfully")
     {:error, errors} ->
-      failed_users = [{index, user_data, errors} | failed_users]
+      _failed_users = [{index, user_data, errors} | failed_users]
       IO.puts("❌ User #{index}: Validation failed")
       Enum.each(errors, &IO.puts("     #{Elixact.Error.format(&1)}"))
   end

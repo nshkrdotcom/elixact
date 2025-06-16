@@ -1,7 +1,7 @@
 #!/usr/bin/env elixir
 
 # Advanced Configuration Example
-# Run with: mix run examples/advanced_config.exs
+# Run with: elixir examples/advanced_config.exs
 
 Mix.install([{:elixact, path: "."}])
 
@@ -75,7 +75,7 @@ IO.puts("✅ Frozen config created")
 
 # Try to merge with frozen config (empty merge should work)
 try do
-  empty_merge = Elixact.Config.merge(frozen_config, %{})
+  _empty_merge = Elixact.Config.merge(frozen_config, %{})
   IO.puts("✅ Empty merge with frozen config succeeded")
 rescue
   RuntimeError -> 
@@ -264,7 +264,12 @@ for {name, config} <- test_configs do
   case Elixact.EnhancedValidator.validate(test_schema, test_data, config: config) do
     {:ok, validated} ->
       IO.puts("✅ #{name}: Validation succeeded")
-      IO.puts("   Age coerced: #{inspect(validated.age)} (#{typeof(validated.age)})")
+      type_name = cond do
+        is_integer(validated.age) -> "integer"
+        is_binary(validated.age) -> "string"
+        true -> "other"
+      end
+      IO.puts("   Age coerced: #{inspect(validated.age)} (#{type_name})")
     {:error, errors} ->
       IO.puts("❌ #{name}: Validation failed")
       IO.puts("   Reason: #{hd(errors).message}")
@@ -272,11 +277,7 @@ for {name, config} <- test_configs do
 end
 
 # Helper function to show type
-defp typeof(value) when is_integer(value), do: "integer"
-defp typeof(value) when is_binary(value), do: "string"
-defp typeof(value) when is_float(value), do: "float"
-defp typeof(value) when is_boolean(value), do: "boolean"
-defp typeof(_), do: "other"
+# Helper function definitions removed - replaced with inline logic above
 
 # Example 11: Builder Validation and Error Recovery
 IO.puts("\n🔧 Example 11: Builder Validation and Error Recovery")

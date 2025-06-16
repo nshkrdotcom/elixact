@@ -1,7 +1,7 @@
 #!/usr/bin/env elixir
 
 # DSPy Integration Pattern Example
-# Run with: mix run examples/dspy_integration.exs
+# Run with: elixir examples/dspy_integration.exs
 
 Mix.install([{:elixact, path: "."}])
 
@@ -87,7 +87,7 @@ valid_output = %{
 }
 
 case DSPyProgram.validate_output(reasoning_schema, valid_output) do
-  {:ok, validated} ->
+  {:ok, _validated} ->
     IO.puts("✅ Valid LLM output accepted")
   {:error, errors} ->
     IO.puts("❌ Valid output rejected: #{inspect(errors)}")
@@ -257,9 +257,9 @@ end
 
 # Test different configurations with the same data
 test_response = %{
-  "answer": "42",  # String key instead of atom
-  "confidence": "0.9",  # String number
-  "extra_info": "This wasn't requested"  # Extra field
+  "answer" => "42",  # String key instead of atom
+  "confidence" => "0.9",  # String number
+  "extra_info" => "This wasn't requested"  # Extra field
 }
 
 configurations = [
@@ -278,9 +278,16 @@ for {name, config} <- configurations do
   case Elixact.EnhancedValidator.validate(simple_schema, test_response, config: config) do
     {:ok, validated} ->
       IO.puts("✅ #{name}: Validation succeeded")
-      IO.puts("   Answer: #{inspect(validated.answer)} (#{typeof(validated.answer)})")
+      answer_type = if is_binary(validated.answer), do: "string", else: "other"
+      IO.puts("   Answer: #{inspect(validated.answer)} (#{answer_type})")
       if Map.has_key?(validated, :confidence) do
-        IO.puts("   Confidence: #{inspect(validated.confidence)} (#{typeof(validated.confidence)})")
+        conf_type = cond do
+          is_float(validated.confidence) -> "float"
+          is_integer(validated.confidence) -> "integer"
+          is_binary(validated.confidence) -> "string"
+          true -> "other"
+        end
+        IO.puts("   Confidence: #{inspect(validated.confidence)} (#{conf_type})")
       end
     {:error, errors} ->
       IO.puts("❌ #{name}: Validation failed")
@@ -289,11 +296,7 @@ for {name, config} <- configurations do
 end
 
 # Helper function
-defp typeof(value) when is_integer(value), do: "integer"
-defp typeof(value) when is_binary(value), do: "string"
-defp typeof(value) when is_float(value), do: "float"
-defp typeof(value) when is_boolean(value), do: "boolean"
-defp typeof(_), do: "other"
+# typeof function definitions removed - replaced with inline logic above
 
 # Example 5: Complete DSPy Program Simulation
 IO.puts("\n🎯 Example 5: Complete DSPy Program Simulation")
@@ -509,7 +512,7 @@ problematic_responses = [
   }
 ]
 
-for (response, index) <- Enum.with_index(problematic_responses) do
+for {response, index} <- Enum.with_index(problematic_responses) do
   IO.puts("\n--- Testing retry pattern #{index + 1} ---")
   
   case DSPyRetryPattern.validate_with_retry(comprehensive_schema, response) do

@@ -81,7 +81,10 @@ defmodule Elixact.EnhancedValidator do
       config = Keyword.get(opts, :config, Config.create())
       validation_opts = Config.to_validation_opts(config)
 
-      Elixact.Validator.validate_schema(schema_module, input, validation_opts[:path] || [])
+      case Elixact.Validator.validate_schema(schema_module, input, validation_opts[:path] || []) do
+        {:ok, validated} -> {:ok, validated}
+        {:error, errors} -> {:error, List.wrap(errors)}
+      end
     else
       # Treat as type specification (atoms like :integer, :string are valid types)
       validate_type_spec(schema_module, input, opts)
@@ -115,6 +118,8 @@ defmodule Elixact.EnhancedValidator do
       iex> Elixact.EnhancedValidator.validate_wrapped(:items, {:array, :string}, ["a", "b"])
       {:ok, ["a", "b"]}
   """
+  @spec validate_wrapped(atom(), TypeAdapter.type_spec(), term(), enhanced_options()) ::
+          {:ok, term()} | {:error, [Elixact.Error.t()]}
   def validate_wrapped(field_name, type_spec, input, opts \\ []) do
     config = Keyword.get(opts, :config, Config.create())
 
