@@ -136,31 +136,7 @@ defmodule Elixact.Validator do
   end
 
   defp do_validate(schema, value, path) when is_atom(schema) do
-    cond do
-      # Check if it's a basic type first (like :atom, :string, :integer, etc.)
-      schema in [:string, :integer, :float, :boolean, :any, :atom, :map] ->
-        case Elixact.Types.validate(schema, value) do
-          {:ok, validated} -> {:ok, validated}
-          {:error, error} -> {:error, %{error | path: path ++ error.path}}
-        end
-
-      Code.ensure_loaded?(schema) and function_exported?(schema, :__schema__, 1) ->
-        validate_schema(schema, value, path)
-
-      Code.ensure_loaded?(schema) and function_exported?(schema, :type_definition, 0) ->
-        schema.validate(value, path)
-
-      value == schema ->
-        {:ok, value}
-
-      true ->
-        {:error,
-         Elixact.Error.new(
-           path,
-           :type,
-           "expected literal atom #{inspect(schema)}, got #{inspect(value)}"
-         )}
-    end
+    do_validate_atom_schema(schema, value, path)
   end
 
   defp do_validate({:type, name, constraints}, value, path) do
@@ -250,6 +226,35 @@ defmodule Elixact.Validator do
               {:error, [Elixact.Error.new(path, :type, "value did not match any type in union")]}
             end
         end
+    end
+  end
+
+  defp do_validate_atom_schema(schema, value, path)
+       when schema in [:string, :integer, :float, :boolean, :any, :atom, :map] do
+    case Elixact.Types.validate(schema, value) do
+      {:ok, validated} -> {:ok, validated}
+      {:error, error} -> {:error, %{error | path: path ++ error.path}}
+    end
+  end
+
+  defp do_validate_atom_schema(schema, value, path) do
+    cond do
+      Code.ensure_loaded?(schema) and function_exported?(schema, :__schema__, 1) ->
+        validate_schema(schema, value, path)
+
+      Code.ensure_loaded?(schema) and function_exported?(schema, :type_definition, 0) ->
+        schema.validate(value, path)
+
+      value == schema ->
+        {:ok, value}
+
+      true ->
+        {:error,
+         Elixact.Error.new(
+           path,
+           :type,
+           "expected literal atom #{inspect(schema)}, got #{inspect(value)}"
+         )}
     end
   end
 
