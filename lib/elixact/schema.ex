@@ -1109,7 +1109,7 @@ defmodule Elixact.Schema do
   end
 
   # Private helper function for generating unique function names
-  @spec generate_function_name(<<_::64, _::_*8>>, nil) :: atom()
+  @spec generate_function_name(String.t(), String.t() | nil) :: atom()
   defp generate_function_name(prefix, suffix \\ nil) do
     base_name = if suffix, do: "#{prefix}_#{suffix}", else: prefix
     unique_id = System.unique_integer([:positive])

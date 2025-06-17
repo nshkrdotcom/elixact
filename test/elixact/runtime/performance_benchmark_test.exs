@@ -320,6 +320,7 @@ defmodule Elixact.Runtime.PerformanceBenchmarkTest do
       _cleanup = {dynamic_schemas, enhanced_schemas}
     end
 
+    @tag :performance
     test "validation scalability with field count" do
       # Test how validation performance scales with number of fields
       field_counts = [5, 10, 20, 50]

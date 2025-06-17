@@ -259,6 +259,22 @@ defmodule Elixact.Runtime.EnhancedSchema do
 
   # Private helper functions
 
+  @doc """
+  Processes model validators and converts anonymous functions to named references.
+
+  ## Parameters
+    * `validators` - List of validator specifications (module/function tuples or functions)
+
+  ## Returns
+    * Tuple of `{processed_validators, runtime_functions}` where runtime_functions
+      contains any anonymous functions converted to named references
+
+  ## Examples
+
+      iex> validators = [{MyModule, :my_validator}, fn x -> x.valid end]
+      iex> {processed, functions} = process_model_validators(validators)
+      {[{MyModule, :my_validator}, {:runtime, :generated_name}], %{generated_name: #Function<...>}}
+  """
   @spec process_model_validators([validator_spec()]) ::
           {[validator_spec()], %{atom() => function()}}
   def process_model_validators(validators) do
@@ -287,6 +303,23 @@ defmodule Elixact.Runtime.EnhancedSchema do
     {{:runtime, function_name}, updated_functions}
   end
 
+  @doc """
+  Processes computed field specifications and converts anonymous functions to named references.
+
+  ## Parameters
+    * `computed_fields` - List of computed field specifications
+    * `initial_functions` - Map of existing runtime functions to extend
+
+  ## Returns
+    * Tuple of `{processed_fields, updated_functions}` where updated_functions
+      contains both initial and any new anonymous functions converted to named references
+
+  ## Examples
+
+      iex> fields = [%{name: :full_name, function: fn x -> x.first <> " " <> x.last end}]
+      iex> {processed, functions} = process_computed_fields(fields, %{})
+      {[%{name: :full_name, function: {:runtime, :generated_name}}], %{generated_name: #Function<...>}}
+  """
   @spec process_computed_fields([computed_field_spec()], %{atom() => function()}) ::
           {[computed_field_spec()], %{atom() => function()}}
   def process_computed_fields(computed_fields, initial_functions) do

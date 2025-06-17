@@ -68,6 +68,20 @@ defmodule Elixact.JsonSchema.ReferenceStore do
     end)
   end
 
+  @doc """
+  Gets all module references currently tracked in the store.
+
+  ## Parameters
+    * `agent` - The reference store process PID
+
+  ## Returns
+    * List of module atoms
+
+  ## Examples
+
+      iex> Elixact.JsonSchema.ReferenceStore.get_references(store)
+      [MySchema, AnotherSchema]
+  """
   @spec get_references(pid()) :: [module()]
   def get_references(agent) do
     Agent.get(agent, fn state ->
@@ -75,6 +89,21 @@ defmodule Elixact.JsonSchema.ReferenceStore do
     end)
   end
 
+  @doc """
+  Checks if a module reference is already tracked in the store.
+
+  ## Parameters
+    * `agent` - The reference store process PID
+    * `module` - The module to check for
+
+  ## Returns
+    * `true` if the module is tracked, `false` otherwise
+
+  ## Examples
+
+      iex> Elixact.JsonSchema.ReferenceStore.has_reference?(store, MySchema)
+      true
+  """
   @spec has_reference?(pid(), module()) :: boolean()
   def has_reference?(agent, module) do
     Agent.get(agent, fn state ->
@@ -82,6 +111,20 @@ defmodule Elixact.JsonSchema.ReferenceStore do
     end)
   end
 
+  @doc """
+  Adds a JSON Schema definition for a module.
+
+  ## Parameters
+    * `agent` - The reference store process PID
+    * `module` - The module for which to store the schema definition
+    * `schema` - The JSON Schema map representation
+
+  ## Examples
+
+      iex> schema = %{"type" => "object", "properties" => %{}}
+      iex> Elixact.JsonSchema.ReferenceStore.add_definition(store, MySchema, schema)
+      :ok
+  """
   @spec add_definition(pid(), module(), map()) :: :ok
   def add_definition(agent, module, schema) do
     Agent.update(agent, fn state ->
@@ -89,6 +132,21 @@ defmodule Elixact.JsonSchema.ReferenceStore do
     end)
   end
 
+  @doc """
+  Checks if a schema definition exists for a module.
+
+  ## Parameters
+    * `agent` - The reference store process PID
+    * `module` - The module to check for a definition
+
+  ## Returns
+    * `true` if a definition exists, `false` otherwise
+
+  ## Examples
+
+      iex> Elixact.JsonSchema.ReferenceStore.has_definition?(store, MySchema)
+      false
+  """
   @spec has_definition?(pid(), module()) :: boolean()
   def has_definition?(agent, module) do
     Agent.get(agent, fn state ->
@@ -96,11 +154,39 @@ defmodule Elixact.JsonSchema.ReferenceStore do
     end)
   end
 
+  @doc """
+  Gets all schema definitions currently stored.
+
+  ## Parameters
+    * `agent` - The reference store process PID
+
+  ## Returns
+    * Map of module names to their JSON Schema definitions
+
+  ## Examples
+
+      iex> Elixact.JsonSchema.ReferenceStore.get_definitions(store)
+      %{"MySchema" => %{"type" => "object"}}
+  """
   @spec get_definitions(pid()) :: %{String.t() => map()}
   def get_definitions(agent) do
     Agent.get(agent, fn state -> state.definitions end)
   end
 
+  @doc """
+  Generates a JSON Schema reference path for a module.
+
+  ## Parameters
+    * `module` - The module to generate a reference path for
+
+  ## Returns
+    * JSON Schema reference string in the format "#/definitions/ModuleName"
+
+  ## Examples
+
+      iex> Elixact.JsonSchema.ReferenceStore.ref_path(MySchema)
+      "#/definitions/MySchema"
+  """
   @spec ref_path(module()) :: String.t()
   def ref_path(module) do
     "#/definitions/#{module_name(module)}"
