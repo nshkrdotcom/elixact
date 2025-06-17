@@ -288,6 +288,30 @@ defmodule Elixact.TypeAdapter do
     end)
   end
 
+  defp attempt_coercion({:tuple, types}, value) when is_tuple(value) do
+    value_list = Tuple.to_list(value)
+
+    if length(value_list) == length(types) do
+      results =
+        Enum.zip(types, value_list)
+        |> Enum.map(fn {type, val} ->
+          attempt_coercion(type, val)
+        end)
+
+      case Enum.split_with(results, &match?({:ok, _}, &1)) do
+        {oks, []} ->
+          coerced_values = Enum.map(oks, fn {:ok, val} -> val end)
+          {:ok, List.to_tuple(coerced_values)}
+
+        {_, errors} ->
+          first_error = hd(errors)
+          {:error, "tuple coercion failed: #{elem(first_error, 1)}"}
+      end
+    else
+      {:error, "tuple size mismatch"}
+    end
+  end
+
   defp attempt_coercion(_, value) do
     # No coercion needed/possible
     {:ok, value}
@@ -386,6 +410,31 @@ defmodule Elixact.TypeAdapter do
         {:error, _} -> {:cont, acc}
       end
     end)
+  end
+
+  defp serialize_value({:tuple, types}, value, exclude_none, exclude_defaults)
+       when is_tuple(value) do
+    value_list = Tuple.to_list(value)
+
+    if length(value_list) == length(types) do
+      results =
+        Enum.zip(types, value_list)
+        |> Enum.map(fn {type, val} ->
+          serialize_value(type, val, exclude_none, exclude_defaults)
+        end)
+
+      case Enum.split_with(results, &match?({:ok, _}, &1)) do
+        {oks, []} ->
+          serialized_items = Enum.map(oks, fn {:ok, val} -> val end)
+          {:ok, serialized_items}
+
+        {_, errors} ->
+          first_error = hd(errors)
+          {:error, "tuple serialization failed: #{elem(first_error, 1)}"}
+      end
+    else
+      {:error, "tuple size mismatch"}
+    end
   end
 
   defp serialize_value({:ref, schema}, value, exclude_none, exclude_defaults)

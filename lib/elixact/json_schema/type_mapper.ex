@@ -37,6 +37,11 @@ defmodule Elixact.JsonSchema.TypeMapper do
     end
   end
 
+  def to_json_schema({:tuple, _} = type, store) do
+    # Handle tuple type directly since it doesn't fit the standard normalization pattern
+    convert_type(type, store)
+  end
+
   def to_json_schema(type, store) do
     normalized_type = normalize_type(type)
     convert_normalized_type(normalized_type, store)
@@ -113,6 +118,10 @@ defmodule Elixact.JsonSchema.TypeMapper do
     {:union, Enum.map(types, &normalize_type/1), []}
   end
 
+  defp normalize_type({:tuple, types}) when is_list(types) do
+    {:tuple, Enum.map(types, &normalize_type/1)}
+  end
+
   defp normalize_type(type), do: type
 
   # Convert normalized types
@@ -164,6 +173,10 @@ defmodule Elixact.JsonSchema.TypeMapper do
 
   defp convert_type({:union, types, constraints}, store) do
     map_union_type(types, constraints, store)
+  end
+
+  defp convert_type({:tuple, types}, store) do
+    map_tuple_type(types, store)
   end
 
   # NOTE: All valid patterns for convert_type/2 are explicitly handled below.
@@ -220,6 +233,18 @@ defmodule Elixact.JsonSchema.TypeMapper do
     }
 
     apply_constraints(base, constraints)
+  end
+
+  # Tuple type mapping
+  @spec map_tuple_type([Elixact.Types.type_definition()], pid() | nil) :: map()
+  defp map_tuple_type(types, store) do
+    %{
+      "type" => "array",
+      "items" => false,
+      "prefixItems" => Enum.map(types, &to_json_schema(&1, store)),
+      "minItems" => length(types),
+      "maxItems" => length(types)
+    }
   end
 
   # Constraint mapping
