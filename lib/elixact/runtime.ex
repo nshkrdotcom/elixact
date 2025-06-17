@@ -757,7 +757,8 @@ defmodule Elixact.Runtime do
       example: Keyword.get(opts, :example),
       examples: Keyword.get(opts, :examples),
       default: Keyword.get(opts, :default),
-      constraints: extract_constraints(opts)
+      constraints: extract_constraints(opts),
+      extra: Keyword.get(opts, :extra, %{})
     }
 
     # If default is provided, make field optional
