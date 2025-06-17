@@ -6,6 +6,7 @@ This guide demonstrates how to use Elixact for AI and Large Language Model (LLM)
 
 - [Overview](#overview)
 - [Structured Output Validation](#structured-output-validation)
+- [DSPy Field Metadata](#dspy-field-metadata)
 - [DSPy Integration Patterns](#dspy-integration-patterns)
 - [Provider-Specific Optimizations](#provider-specific-optimizations)
 - [Dynamic Schema Generation](#dynamic-schema-generation)
@@ -21,6 +22,7 @@ Elixact provides comprehensive support for LLM integration through:
 - **Type coercion** to handle LLM string outputs
 - **JSON Schema optimization** for different LLM providers
 - **DSPy integration patterns** for structured programming
+- **Field metadata** for DSPy-style annotations and LLM hints
 - **Validation pipelines** for multi-step LLM workflows
 
 ## Structured Output Validation
@@ -33,57 +35,48 @@ defmodule LLMResponseSchema do
   use Elixact, define_struct: true
 
   schema "LLM structured output" do
+    # Input fields with DSPy metadata
+    field :question, :string do
+      required()
+      min_length(1)
+      extra("__dspy_field_type", "input")
+      extra("prefix", "Question:")
+    end
+
+    field :context, :string do
+      optional()
+      extra("__dspy_field_type", "input")
+      extra("prefix", "Context:")
+    end
+
+    # Output fields with metadata
     field :reasoning, :string do
       description("Step-by-step reasoning process")
       min_length(10)
+      extra("__dspy_field_type", "output")
+      extra("prefix", "Reasoning:")
     end
 
     field :answer, :string do
       required()
       min_length(1)
       description("Final answer to the question")
+      extra("__dspy_field_type", "output")
+      extra("prefix", "Answer:")
     end
 
     field :confidence, :float do
       required()
       gteq(0.0)
       lteq(1.0)
-      description("Confidence score between 0 and 1")
+      extra("__dspy_field_type", "output")
     end
 
     field :sources, {:array, :string} do
       optional()
-      description("List of sources used")
+      extra("__dspy_field_type", "output")
+      extra("render_as", "list")
     end
-
-    # Validate that high confidence answers have reasoning
-    model_validator :validate_confidence_reasoning
-
-    # Compute additional metrics
-    computed_field :reasoning_length, :integer, :count_reasoning_words
-    computed_field :answer_category, :string, :categorize_answer
-  end
-
-  def validate_confidence_reasoning(input) do
-    if input.confidence > 0.8 and String.length(input.reasoning) < 50 do
-      {:error, "High confidence answers must include detailed reasoning"}
-    else
-      {:ok, input}
-    end
-  end
-
-  def count_reasoning_words(input) do
-    word_count = input.reasoning |> String.split() |> length()
-    {:ok, word_count}
-  end
-
-  def categorize_answer(input) do
-    category = cond do
-      String.length(input.answer) < 10 -> "short"
-      String.length(input.answer) < 100 -> "medium"
-      true -> "long"
-    end
-    {:ok, category}
   end
 end
 
@@ -353,6 +346,152 @@ case DSPyProgram.execute(reasoning_program, initial_data) do
 end
 ```
 
+## DSPy Field Metadata
+
+Elixact now supports arbitrary field metadata, which is particularly useful for DSPy-style programming patterns and LLM integrations. This feature allows you to attach custom key-value pairs to fields for various purposes.
+
+### Basic Field Metadata
+
+```elixir
+defmodule LLMSignature do
+  use Elixact
+
+  schema do
+    # Using options syntax
+    field :query, :string, extra: %{
+      "__dspy_field_type" => "input",
+      "prefix" => "Query:",
+      "description" => "The search query"
+    }
+
+    # Using do-block syntax with extra macro
+    field :response, :string do
+      required()
+      min_length(10)
+      extra("__dspy_field_type", "output")
+      extra("prefix", "Response:")
+      extra("format_hints", ["complete sentences", "markdown"])
+    end
+  end
+end
+```
+
+### Creating DSPy-Style Helper Macros
+
+```elixir
+defmodule DSPyHelpers do
+  defmacro input_field(name, type, opts \\ []) do
+    quote do
+      field(unquote(name), unquote(type),
+        extra: %{
+          "__dspy_field_type" => "input",
+          "prefix" => "#{unquote(name)}:"
+        }
+      )
+    end
+  end
+
+  defmacro output_field(name, type, opts \\ []) do
+    base_map = %{
+      "__dspy_field_type" => "output",
+      "prefix" => "#{opts[:prefix] || "#{name}:"}"
+    }
+    extra = Keyword.get(opts, :extra, %{})
+    merged = Map.merge(base_map, extra)
+
+    quote do
+      field(unquote(name), unquote(type), extra: unquote(Macro.escape(merged)))
+    end
+  end
+end
+
+# Using the helper macros
+defmodule QASignature do
+  use Elixact
+  import DSPyHelpers
+
+  schema do
+    input_field :question, :string
+    input_field :context, :string
+
+    output_field :reasoning, :string,
+      extra: %{"format_hints" => ["step by step", "logical"]}
+
+    output_field :answer, :string,
+      extra: %{"format_hints" => ["concise", "accurate"]}
+  end
+end
+```
+
+### Filtering Fields by Metadata
+
+```elixir
+defmodule LLMWorkflow do
+  def get_input_fields(schema_module) do
+    schema_module.__schema__(:fields)
+    |> Enum.filter(fn {_name, meta} ->
+      meta.extra["__dspy_field_type"] == "input"
+    end)
+  end
+
+  def get_output_fields(schema_module) do
+    schema_module.__schema__(:fields)
+    |> Enum.filter(fn {_name, meta} ->
+      meta.extra["__dspy_field_type"] == "output"
+    end)
+  end
+
+  def generate_prompt(schema_module, input_data) do
+    input_fields = get_input_fields(schema_module)
+    
+    input_fields
+    |> Enum.map(fn {name, meta} ->
+      prefix = meta.extra["prefix"] || "#{name}:"
+      value = Map.get(input_data, name)
+      "#{prefix} #{value}"
+    end)
+    |> Enum.join("\n")
+  end
+end
+```
+
+### Common Field Metadata Patterns
+
+1. **DSPy Integration**:
+   ```elixir
+   extra: %{
+     "__dspy_field_type" => "input" | "output",
+     "prefix" => "Question:",
+     "format_hints" => ["markdown", "complete sentences"]
+   }
+   ```
+
+2. **LLM Provider Hints**:
+   ```elixir
+   extra: %{
+     "openai_function_param" => true,
+     "anthropic_tool_field" => true,
+     "max_tokens" => 500
+   }
+   ```
+
+3. **Rendering Instructions**:
+   ```elixir
+   extra: %{
+     "render_as" => "list" | "table" | "code",
+     "syntax_highlight" => "python",
+     "collapsible" => true
+   }
+   ```
+
+4. **Validation Context**:
+   ```elixir
+   extra: %{
+     "validation_group" => "user_input",
+     "sensitive" => true,
+     "sanitize" => true
+   }
+   ```
 ## Provider-Specific Optimizations
 
 ### OpenAI Function Calling
@@ -2001,6 +2140,5 @@ Key benefits of using Elixact for LLM integration:
 - **Quality Assurance**: Comprehensive assessment of LLM output quality across multiple dimensions
 
 Whether you're building simple LLM-powered applications or complex multi-agent systems, Elixact provides the validation and schema management tools needed for reliable, production-ready AI applications.
-```
 
 This completes the comprehensive LLM Integration Guide, covering all the advanced patterns and use cases for integrating Elixact with Large Language Models, from basic output validation to sophisticated multi-agent coordination systems.

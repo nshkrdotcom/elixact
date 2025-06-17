@@ -186,6 +186,70 @@ field :email, :string do
 end
 ```
 
+### Arbitrary Field Metadata
+
+Fields can have arbitrary metadata attached using the `extra` option or `extra` macro:
+
+```elixir
+# Using options syntax
+field :question, :string, extra: %{
+  "__dspy_field_type" => "input",
+  "prefix" => "Question:"
+}
+
+# Using do-block syntax
+field :answer, :string do
+  required()
+  min_length(1)
+  extra("__dspy_field_type", "output")
+  extra("prefix", "Answer:")
+end
+```
+
+Extra metadata is useful for:
+- DSPy-style field type annotations
+- Framework-specific field configuration
+- Custom UI rendering hints
+- Integration with external tools
+
+Example with DSPy-style helpers:
+
+```elixir
+defmodule QASchema do
+  use Elixact
+  
+  schema do
+    # Input fields
+    field :question, :string, extra: %{"__dspy_field_type" => "input"}
+    field :context, :string, extra: %{"__dspy_field_type" => "input"}
+    
+    # Output fields with additional metadata
+    field :reasoning, :string do
+      extra("__dspy_field_type", "output")
+      extra("prefix", "Reasoning:")
+    end
+    
+    field :answer, :string do
+      extra("__dspy_field_type", "output")
+      extra("prefix", "Answer:")
+    end
+  end
+end
+
+# Filter fields by metadata
+schema_fields = QASchema.__schema__(:fields)
+
+input_fields = 
+  Enum.filter(schema_fields, fn {_name, meta} -> 
+    meta.extra["__dspy_field_type"] == "input"
+  end)
+
+output_fields =
+  Enum.filter(schema_fields, fn {_name, meta} -> 
+    meta.extra["__dspy_field_type"] == "output"
+  end)
+```
+
 ## Runtime Schema Creation
 
 Create schemas dynamically for DSPy-style applications:
