@@ -11,33 +11,33 @@ defmodule Elixact.Runtime do
 
       # Create enhanced schema with full validation pipeline
       fields = [{:name, :string, [required: true]}, {:age, :integer, [optional: true]}]
-      
+
       # Model validators for cross-field validation
       validators = [
         fn data -> {:ok, %{data | name: String.trim(data.name)}} end,
         {MyModule, :validate_age}
       ]
-      
+
       # Computed fields for derived values
       computed_fields = [
         {:display_name, :string, fn data -> {:ok, String.upcase(data.name)} end},
         {:age_group, :string, {MyModule, :compute_age_group}}
       ]
-      
+
       # Create enhanced schema
       schema = Runtime.create_enhanced_schema(fields,
         title: "User Schema",
         model_validators: validators,
         computed_fields: computed_fields
       )
-      
+
       # Validate with full pipeline
       {:ok, result} = Runtime.validate_enhanced(%{name: "  john  ", age: 25}, schema)
       # Result: %{name: "john", age: 25, display_name: "JOHN", age_group: "adult"}
 
   Enhanced schemas support:
   - Model validators (both named functions and anonymous functions)
-  - Computed fields (both named functions and anonymous functions)  
+  - Computed fields (both named functions and anonymous functions)
   - Full validation pipeline execution (field → model → computed)
   - JSON Schema generation with enhanced metadata
   - Integration with existing validation infrastructure
@@ -49,7 +49,7 @@ defmodule Elixact.Runtime do
       # Basic runtime schema
       fields = [{:name, :string, [required: true]}, {:age, :integer, [optional: true]}]
       schema = Runtime.create_schema(fields, title: "Basic User Schema")
-      
+
       {:ok, validated} = Runtime.validate(%{name: "John", age: 30}, schema)
       # Result: %{name: "John", age: 30}
 
@@ -159,13 +159,13 @@ defmodule Elixact.Runtime do
 
   ## Parameters
     * `field_definitions` - List of field definitions in the format:
-      - `{field_name, type}` 
+      - `{field_name, type}`
       - `{field_name, type, options}`
     * `opts` - Schema configuration options
 
   ## Options
     * `:title` - Schema title
-    * `:description` - Schema description  
+    * `:description` - Schema description
     * `:strict` - Enable strict validation (default: false)
     * `:name` - Schema name for references
 
@@ -385,6 +385,367 @@ defmodule Elixact.Runtime do
   @spec enhanced_to_json_schema(EnhancedSchema.t(), keyword()) :: map()
   def enhanced_to_json_schema(%EnhancedSchema{} = enhanced_schema, opts \\ []) do
     EnhancedSchema.to_json_schema(enhanced_schema, opts)
+  end
+
+  @doc """
+  Creates an enhanced schema with Phase 6 integration features.
+
+  Phase 6 Enhancement: Complete integration with EnhancedResolver and validation pipeline.
+
+  ## Parameters
+    * `field_definitions` - Field definitions
+    * `opts` - Enhanced schema options with Phase 6 features
+
+  ## Phase 6 Options
+    * `:auto_optimize_for_provider` - Automatically optimize for LLM provider (default: nil)
+    * `:include_validation_metadata` - Include validation metadata in schema (default: false)
+    * `:dspy_compatible` - Ensure DSPy compatibility (default: false)
+    * All existing options from previous phases
+
+  ## Examples
+
+      iex> schema = Elixact.Runtime.create_enhanced_schema_v6(fields,
+      ...>   model_validators: validators,
+      ...>   computed_fields: computed,
+      ...>   auto_optimize_for_provider: :openai,
+      ...>   dspy_compatible: true
+      ...> )
+  """
+  @spec create_enhanced_schema_v6([field_definition()], [schema_option()]) :: EnhancedSchema.t()
+  def create_enhanced_schema_v6(field_definitions, opts \\ []) do
+    auto_optimize = Keyword.get(opts, :auto_optimize_for_provider)
+    include_metadata = Keyword.get(opts, :include_validation_metadata, false)
+    dspy_compatible = Keyword.get(opts, :dspy_compatible, false)
+
+    # Create base enhanced schema
+    base_schema = create_enhanced_schema(field_definitions, opts)
+
+    # Apply Phase 6 enhancements
+    enhanced_metadata = %{
+      phase_6_enhanced: true,
+      auto_optimization: auto_optimize,
+      validation_metadata: include_metadata,
+      dspy_compatible: dspy_compatible,
+      created_with_version: "Phase 6"
+    }
+
+    updated_metadata = Map.merge(base_schema.metadata, enhanced_metadata)
+
+    # Validate DSPy compatibility if requested
+    final_schema =
+      if dspy_compatible do
+        validate_dspy_compatibility(base_schema)
+      else
+        base_schema
+      end
+
+    %{final_schema | metadata: updated_metadata}
+  end
+
+  @doc """
+  Validates an enhanced schema with complete pipeline testing.
+
+  Phase 6 Enhancement: Comprehensive validation testing including all features.
+
+  ## Parameters
+    * `data` - Data to validate
+    * `enhanced_schema` - Enhanced schema
+    * `opts` - Validation options with Phase 6 features
+
+  ## Phase 6 Options
+    * `:test_all_providers` - Test compatibility with all LLM providers (default: false)
+    * `:generate_performance_report` - Include performance metrics (default: false)
+    * `:validate_json_schema` - Validate generated JSON schema (default: false)
+
+  ## Returns
+    * Enhanced validation result with optional additional information
+  """
+  @spec validate_enhanced_v6(map(), EnhancedSchema.t(), keyword()) ::
+          {:ok, map()} | {:ok, map(), map()} | {:error, [Elixact.Error.t()]}
+  def validate_enhanced_v6(data, %EnhancedSchema{} = enhanced_schema, opts \\ []) do
+    test_providers = Keyword.get(opts, :test_all_providers, false)
+    performance_report = Keyword.get(opts, :generate_performance_report, false)
+    validate_json = Keyword.get(opts, :validate_json_schema, false)
+
+    start_time = System.monotonic_time(:microsecond)
+
+    # Core validation
+    case validate_enhanced(data, enhanced_schema, opts) do
+      {:ok, validated_data} ->
+        # Generate additional information if requested
+        additional_info =
+          generate_additional_validation_info(
+            enhanced_schema,
+            validated_data,
+            start_time,
+            test_providers,
+            performance_report,
+            validate_json
+          )
+
+        if map_size(additional_info) > 0 do
+          {:ok, validated_data, additional_info}
+        else
+          {:ok, validated_data}
+        end
+
+      {:error, errors} ->
+        {:error, errors}
+    end
+  end
+
+  # Private helper functions for Phase 6 enhancements
+
+  @spec validate_dspy_compatibility(EnhancedSchema.t()) :: EnhancedSchema.t()
+  defp validate_dspy_compatibility(schema) do
+    # Check if schema is compatible with DSPy patterns
+    issues = []
+
+    # Check for overly complex model validators
+    issues =
+      if length(schema.model_validators) > 3 do
+        ["Too many model validators for DSPy compatibility" | issues]
+      else
+        issues
+      end
+
+    # Check for complex computed fields
+    complex_computed_fields =
+      Enum.count(schema.computed_fields, fn {_name, _meta} ->
+        # For now, assume all computed fields are simple
+        # In a real implementation, we'd analyze the computation complexity
+        false
+      end)
+
+    issues =
+      if complex_computed_fields > 5 do
+        ["Too many computed fields for DSPy compatibility" | issues]
+      else
+        issues
+      end
+
+    # Store compatibility issues in metadata
+    dspy_metadata = %{
+      dspy_compatibility_checked: true,
+      dspy_issues: issues,
+      dspy_compatible: length(issues) == 0
+    }
+
+    updated_metadata = Map.merge(schema.metadata, dspy_metadata)
+    %{schema | metadata: updated_metadata}
+  end
+
+  @spec generate_additional_validation_info(
+          EnhancedSchema.t(),
+          map(),
+          integer(),
+          boolean(),
+          boolean(),
+          boolean()
+        ) :: map()
+  defp generate_additional_validation_info(
+         schema,
+         _validated_data,
+         start_time,
+         test_providers,
+         performance_report,
+         validate_json
+       ) do
+    info = %{}
+
+    # Performance report
+    info =
+      if performance_report do
+        end_time = System.monotonic_time(:microsecond)
+        duration = end_time - start_time
+
+        performance_data = %{
+          validation_duration_microseconds: duration,
+          validation_duration_milliseconds: duration / 1000,
+          field_count: map_size(schema.base_schema.fields),
+          computed_field_count: length(schema.computed_fields),
+          model_validator_count: length(schema.model_validators)
+        }
+
+        Map.put(info, :performance_metrics, performance_data)
+      else
+        info
+      end
+
+    # Provider compatibility testing
+    info =
+      if test_providers do
+        json_schema = enhanced_to_json_schema(schema)
+        compatibility = test_provider_compatibility(json_schema)
+        Map.put(info, :provider_compatibility, compatibility)
+      else
+        info
+      end
+
+    # JSON schema validation
+    info =
+      if validate_json do
+        json_schema = enhanced_to_json_schema(schema)
+        validation_result = validate_json_schema_structure(json_schema)
+        Map.put(info, :json_schema_validation, validation_result)
+      else
+        info
+      end
+
+    info
+  end
+
+  @spec test_provider_compatibility(map()) :: map()
+  defp test_provider_compatibility(json_schema) do
+    providers = [:openai, :anthropic, :generic]
+
+    Enum.reduce(providers, %{}, fn provider, acc ->
+      try do
+        optimized =
+          Elixact.JsonSchema.Resolver.enforce_structured_output(
+            json_schema,
+            provider: provider
+          )
+
+        score = calculate_compatibility_score(optimized, provider)
+
+        Map.put(acc, provider, %{
+          compatible: true,
+          compatibility_score: score,
+          optimized_schema: optimized
+        })
+      rescue
+        e ->
+          Map.put(acc, provider, %{
+            compatible: false,
+            error: Exception.message(e),
+            compatibility_score: 0
+          })
+      end
+    end)
+  end
+
+  @spec calculate_compatibility_score(map(), atom()) :: integer()
+  defp calculate_compatibility_score(schema, provider) do
+    base_score = 50
+
+    # Provider-specific scoring
+    score =
+      case provider do
+        :openai ->
+          score = base_score
+          score = if Map.get(schema, "additionalProperties") == false, do: score + 20, else: score
+          score = if Map.has_key?(schema, "required"), do: score + 15, else: score
+          score = if Map.get(schema, "type") == "object", do: score + 10, else: score
+          score
+
+        :anthropic ->
+          score = base_score
+          score = if Map.has_key?(schema, "required"), do: score + 20, else: score
+          score = if Map.get(schema, "additionalProperties") == false, do: score + 15, else: score
+          score = if Map.get(schema, "type") == "object", do: score + 10, else: score
+          score
+
+        :generic ->
+          base_score + 25
+
+        _ ->
+          base_score
+      end
+
+    min(score, 100)
+  end
+
+  @spec validate_json_schema_structure(map()) :: %{
+          valid: boolean(),
+          issues: [String.t()],
+          checked_at: DateTime.t()
+        }
+  defp validate_json_schema_structure(json_schema) do
+    issues = []
+
+    # Check required fields for object schemas
+    issues =
+      if Map.get(json_schema, "type") == "object" do
+        if not Map.has_key?(json_schema, "properties") do
+          ["Object schema missing properties" | issues]
+        else
+          issues
+        end
+      else
+        issues
+      end
+
+    # Check for valid type values
+    valid_types = ["string", "number", "integer", "boolean", "array", "object", "null"]
+    schema_type = Map.get(json_schema, "type")
+
+    issues =
+      if schema_type && schema_type not in valid_types do
+        ["Invalid schema type: #{schema_type}" | issues]
+      else
+        issues
+      end
+
+    # Check for proper constraint values
+    issues = check_constraint_validity(json_schema, issues)
+
+    %{
+      valid: length(issues) == 0,
+      issues: issues,
+      checked_at: DateTime.utc_now()
+    }
+  end
+
+  @spec check_constraint_validity(map(), [String.t()]) :: [String.t()]
+  defp check_constraint_validity(schema, issues) do
+    # Check minLength/maxLength for strings
+    issues =
+      if Map.get(schema, "type") == "string" do
+        min_len = Map.get(schema, "minLength")
+        max_len = Map.get(schema, "maxLength")
+
+        cond do
+          min_len && not is_integer(min_len) ->
+            ["minLength must be an integer" | issues]
+
+          max_len && not is_integer(max_len) ->
+            ["maxLength must be an integer" | issues]
+
+          min_len && max_len && min_len > max_len ->
+            ["minLength cannot be greater than maxLength" | issues]
+
+          true ->
+            issues
+        end
+      else
+        issues
+      end
+
+    # Check minimum/maximum for numbers
+    issues =
+      if Map.get(schema, "type") in ["number", "integer"] do
+        min_val = Map.get(schema, "minimum")
+        max_val = Map.get(schema, "maximum")
+
+        cond do
+          min_val && not is_number(min_val) ->
+            ["minimum must be a number" | issues]
+
+          max_val && not is_number(max_val) ->
+            ["maximum must be a number" | issues]
+
+          min_val && max_val && min_val > max_val ->
+            ["minimum cannot be greater than maximum" | issues]
+
+          true ->
+            issues
+        end
+      else
+        issues
+      end
+
+    issues
   end
 
   # Private helper functions

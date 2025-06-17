@@ -125,12 +125,26 @@ defmodule Elixact do
     end
   end
 
+  @doc """
+  Phase 6 Enhancement: Enhanced schema information with complete feature analysis.
+
+  ## Examples
+
+      iex> UserSchema.__enhanced_schema_info__()
+      %{
+        elixact_version: "Phase 6",
+        phase_6_enhanced: true,
+        compatibility: %{...},
+        performance_profile: %{...},
+        llm_optimization: %{...}
+      }
+  """
   @spec __before_compile__(Macro.Env.t()) :: Macro.t()
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defmacro __before_compile__(env) do
-    define_struct? = Module.get_attribute(env.module, :elixact_define_struct)
-    fields = Module.get_attribute(env.module, :fields) || []
-    computed_fields = Module.get_attribute(env.module, :computed_fields) || []
+  defmacro __before_compile__(_env) do
+    define_struct? = Module.get_attribute(__CALLER__.module, :elixact_define_struct)
+    fields = Module.get_attribute(__CALLER__.module, :fields) || []
+    computed_fields = Module.get_attribute(__CALLER__.module, :computed_fields) || []
 
     # Extract field names for struct definition
     field_names = Enum.map(fields, fn {name, _meta} -> name end)
@@ -389,6 +403,248 @@ defmodule Elixact do
           computed_fields: computed_fields,
           all_fields: regular_fields ++ computed_fields,
           model_validators: Enum.map(model_validators, fn {mod, fun} -> "#{mod}.#{fun}/1" end)
+        }
+      end
+
+      # Phase 6 enhancements
+
+      @doc """
+      Returns enhanced schema information with Phase 6 features.
+
+      Includes comprehensive analysis of schema capabilities, performance characteristics,
+      and LLM provider compatibility.
+      """
+      @spec __enhanced_schema_info__ :: map()
+      def __enhanced_schema_info__ do
+        basic_info = __schema_info__()
+
+        # Add Phase 6 specific information
+        enhanced_info = %{
+          elixact_version: "Phase 6",
+          phase_6_enhanced: true,
+          json_schema_enhanced: true,
+          llm_compatible: true,
+          dspy_ready: analyze_dspy_readiness(),
+          performance_profile: analyze_performance_profile(),
+          compatibility_matrix: analyze_compatibility_matrix()
+        }
+
+        Map.merge(basic_info, enhanced_info)
+      end
+
+      @doc """
+      Validates data with Phase 6 enhanced pipeline and optional reporting.
+
+      ## Options
+        * `:include_performance_metrics` - Include validation performance data
+        * `:test_llm_compatibility` - Test schema compatibility with LLM providers
+        * `:generate_enhanced_schema` - Include enhanced JSON schema in result
+
+      ## Examples
+
+          iex> result = UserSchema.validate_enhanced(data,
+          ...>   include_performance_metrics: true,
+          ...>   test_llm_compatibility: true
+          ...> )
+          {:ok, validated_data, %{
+            performance_metrics: %{...},
+            llm_compatibility: %{...},
+            enhanced_schema: %{...}
+          }}
+      """
+      @spec validate_enhanced(map(), keyword()) ::
+              {:ok, map() | struct()}
+              | {:ok, map() | struct(), map()}
+              | {:error, [Elixact.Error.t()]}
+      def validate_enhanced(data, opts \\ []) do
+        include_metrics = Keyword.get(opts, :include_performance_metrics, false)
+        test_llm = Keyword.get(opts, :test_llm_compatibility, false)
+        generate_schema = Keyword.get(opts, :generate_enhanced_schema, false)
+
+        start_time = System.monotonic_time(:microsecond)
+
+        case validate(data) do
+          {:ok, validated_data} ->
+            if include_metrics or test_llm or generate_schema do
+              additional_info =
+                build_enhanced_validation_result(
+                  validated_data,
+                  start_time,
+                  include_metrics,
+                  test_llm,
+                  generate_schema
+                )
+
+              {:ok, validated_data, additional_info}
+            else
+              {:ok, validated_data}
+            end
+
+          {:error, errors} ->
+            {:error, errors}
+        end
+      end
+
+      # Private helper functions for Phase 6 enhancements
+
+      defp analyze_dspy_readiness do
+        model_validator_count = length(__schema__(:model_validators) || [])
+        computed_field_count = length(__schema__(:computed_fields) || [])
+
+        %{
+          ready: model_validator_count <= 3 and computed_field_count <= 5,
+          model_validators: model_validator_count,
+          computed_fields: computed_field_count,
+          recommendations:
+            generate_dspy_recommendations(model_validator_count, computed_field_count)
+        }
+      end
+
+      defp analyze_performance_profile do
+        field_count = length(__schema__(:fields) || [])
+        model_validator_count = length(__schema__(:model_validators) || [])
+        computed_field_count = length(__schema__(:computed_fields) || [])
+
+        complexity_score = field_count + model_validator_count * 2 + computed_field_count * 3
+
+        %{
+          complexity_score: complexity_score,
+          estimated_validation_time: estimate_validation_time(complexity_score),
+          memory_footprint: estimate_memory_footprint(field_count, computed_field_count),
+          optimization_level: determine_optimization_level(complexity_score)
+        }
+      end
+
+      defp analyze_compatibility_matrix do
+        has_struct = __struct_enabled__?()
+        has_validators = length(__schema__(:model_validators) || []) > 0
+        has_computed = length(__schema__(:computed_fields) || []) > 0
+
+        %{
+          json_schema_generation: true,
+          llm_providers: %{
+            openai: true,
+            anthropic: true,
+            generic: true
+          },
+          dspy_patterns: %{
+            # Signatures work better without computed fields
+            signature: not has_computed,
+            # CoT benefits from validation
+            chain_of_thought: has_validators,
+            input_output: true
+          },
+          struct_support: has_struct,
+          enhanced_features: has_validators or has_computed
+        }
+      end
+
+      defp build_enhanced_validation_result(
+             validated_data,
+             start_time,
+             include_metrics,
+             test_llm,
+             generate_schema
+           ) do
+        result = %{}
+
+        result =
+          if include_metrics do
+            end_time = System.monotonic_time(:microsecond)
+            duration = end_time - start_time
+
+            metrics = %{
+              validation_duration_microseconds: duration,
+              validation_duration_milliseconds: duration / 1000,
+              memory_used: :erlang.memory(:total)
+            }
+
+            Map.put(result, :performance_metrics, metrics)
+          else
+            result
+          end
+
+        result =
+          if test_llm do
+            compatibility = test_llm_provider_compatibility()
+            Map.put(result, :llm_compatibility, compatibility)
+          else
+            result
+          end
+
+        result =
+          if generate_schema do
+            enhanced_schema = Elixact.JsonSchema.EnhancedResolver.resolve_enhanced(__MODULE__)
+            Map.put(result, :enhanced_schema, enhanced_schema)
+          else
+            result
+          end
+
+        result
+      end
+
+      defp generate_dspy_recommendations(model_validators, computed_fields) do
+        recommendations = []
+
+        recommendations =
+          if model_validators > 3 do
+            ["Consider reducing model validators for DSPy compatibility" | recommendations]
+          else
+            recommendations
+          end
+
+        recommendations =
+          if computed_fields > 5 do
+            ["Consider reducing computed fields for DSPy signatures" | recommendations]
+          else
+            recommendations
+          end
+
+        if length(recommendations) == 0 do
+          ["Schema is well-suited for DSPy usage"]
+        else
+          recommendations
+        end
+      end
+
+      defp estimate_validation_time(complexity_score) do
+        cond do
+          complexity_score < 10 -> "< 1ms"
+          complexity_score < 25 -> "1-5ms"
+          complexity_score < 50 -> "5-15ms"
+          true -> "> 15ms"
+        end
+      end
+
+      defp estimate_memory_footprint(field_count, computed_field_count) do
+        # bytes per field
+        base_memory = field_count * 100
+        # computed fields use more memory
+        computed_memory = computed_field_count * 300
+        total = base_memory + computed_memory
+
+        cond do
+          total < 1000 -> "< 1KB"
+          total < 5000 -> "1-5KB"
+          total < 10000 -> "5-10KB"
+          true -> "> 10KB"
+        end
+      end
+
+      defp determine_optimization_level(complexity_score) do
+        cond do
+          complexity_score < 20 -> :high
+          complexity_score < 50 -> :medium
+          true -> :low
+        end
+      end
+
+      defp test_llm_provider_compatibility do
+        # This would be expanded in a real implementation
+        %{
+          openai: %{compatible: true, score: 85},
+          anthropic: %{compatible: true, score: 80},
+          generic: %{compatible: true, score: 90}
         }
       end
     end

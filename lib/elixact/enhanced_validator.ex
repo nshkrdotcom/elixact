@@ -338,6 +338,254 @@ defmodule Elixact.EnhancedValidator do
     end)
   end
 
+  @doc """
+  Validates data with enhanced JSON schema generation.
+
+  Phase 6 Enhancement: Integrates with EnhancedResolver for complete pipeline.
+
+  ## Parameters
+    * `target` - What to validate against
+    * `input` - Data to validate
+    * `opts` - Enhanced validation options
+
+  ## Phase 6 Options
+    * `:generate_enhanced_schema` - Include enhanced JSON schema in result (default: false)
+    * `:optimize_for_provider` - LLM provider optimization (default: :generic)
+    * `:include_metadata` - Include validation metadata in result (default: false)
+
+  ## Returns
+    * `{:ok, validated_data}` or `{:ok, validated_data, enhanced_schema}` on success
+    * `{:error, errors}` on validation failure
+
+  ## Examples
+
+      iex> Elixact.EnhancedValidator.validate_with_enhanced_schema(
+      ...>   MySchema,
+      ...>   data,
+      ...>   generate_enhanced_schema: true,
+      ...>   optimize_for_provider: :openai
+      ...> )
+      {:ok, validated_data, %{
+        "type" => "object",
+        "x-elixact-enhanced" => true,
+        "x-openai-optimized" => true,
+        ...
+      }}
+  """
+  @spec validate_with_enhanced_schema(validation_target(), validation_input(), enhanced_options()) ::
+          {:ok, term()} | {:ok, term(), map()} | {:error, [Elixact.Error.t()]}
+  def validate_with_enhanced_schema(target, input, opts \\ []) do
+    generate_schema = Keyword.get(opts, :generate_enhanced_schema, false)
+    provider = Keyword.get(opts, :optimize_for_provider, :generic)
+    include_metadata = Keyword.get(opts, :include_metadata, false)
+
+    case validate(target, input, opts) do
+      {:ok, validated_data} ->
+        if generate_schema do
+          enhanced_schema =
+            Elixact.JsonSchema.EnhancedResolver.resolve_enhanced(target,
+              optimize_for_provider: provider,
+              include_model_validators: true,
+              include_computed_fields: true
+            )
+
+          if include_metadata do
+            metadata = %{
+              validation_time: System.monotonic_time(:microsecond),
+              target_type: determine_target_type(target),
+              enhanced_features: extract_enhanced_features(target),
+              provider_optimization: provider
+            }
+
+            {:ok, validated_data, enhanced_schema, metadata}
+          else
+            {:ok, validated_data, enhanced_schema}
+          end
+        else
+          {:ok, validated_data}
+        end
+
+      {:error, errors} ->
+        {:error, errors}
+    end
+  end
+
+  @doc """
+  Comprehensive validation report with enhanced schema analysis.
+
+  Phase 6 Enhancement: Complete integration testing and analysis.
+
+  ## Parameters
+    * `target` - What to validate against
+    * `input` - Data to validate
+    * `opts` - Enhanced validation options
+
+  ## Returns
+    * Comprehensive validation and schema analysis report
+
+  ## Examples
+
+      iex> report = Elixact.EnhancedValidator.comprehensive_validation_report(
+      ...>   MySchema,
+      ...>   sample_data,
+      ...>   test_providers: [:openai, :anthropic],
+      ...>   include_performance_analysis: true
+      ...> )
+      %{
+        validation_result: {:ok, validated_data},
+        enhanced_schema: %{...},
+        provider_compatibility: %{...},
+        performance_metrics: %{...},
+        recommendations: [...]
+      }
+  """
+  @spec comprehensive_validation_report(
+          validation_target(),
+          validation_input(),
+          enhanced_options()
+        ) :: %{
+          validation_result: {:ok, term()} | {:error, [map()]},
+          enhanced_schema: map(),
+          schema_analysis: %{
+            computed_field_count: non_neg_integer(),
+            field_count: non_neg_integer(),
+            has_config: boolean(),
+            model_validator_count: non_neg_integer(),
+            struct_support: boolean()
+          },
+          provider_compatibility: map(),
+          performance_metrics:
+            %{
+              validation_duration_microseconds: integer(),
+              validation_duration_milliseconds: float(),
+              memory_usage: non_neg_integer(),
+              complexity_analysis: map()
+            }
+            | nil,
+          dspy_analysis:
+            %{
+              signature_compatible: boolean(),
+              recommendations: [binary()]
+            }
+            | nil,
+          recommendations: [binary()],
+          generated_at: DateTime.t()
+        }
+  def comprehensive_validation_report(target, input, opts \\ []) do
+    test_providers = Keyword.get(opts, :test_providers, [:openai, :anthropic, :generic])
+    include_performance = Keyword.get(opts, :include_performance_analysis, true)
+    include_dspy_analysis = Keyword.get(opts, :include_dspy_analysis, false)
+
+    start_time = System.monotonic_time(:microsecond)
+
+    # Core validation
+    validation_result = validate(target, input, opts)
+
+    # Enhanced schema analysis
+    enhanced_analysis =
+      Elixact.JsonSchema.EnhancedResolver.comprehensive_analysis(
+        target,
+        input,
+        include_validation_test: false,
+        test_llm_providers: test_providers
+      )
+
+    # DSPy analysis if requested
+    dspy_analysis =
+      if include_dspy_analysis do
+        # Basic DSPy compatibility info
+        features = extract_enhanced_features(target)
+
+        %{
+          signature_compatible: features.computed_fields < 3,
+          recommendations:
+            if features.computed_fields > 2 do
+              ["Consider reducing computed fields for DSPy compatibility"]
+            else
+              ["Schema appears suitable for DSPy usage"]
+            end
+        }
+      else
+        nil
+      end
+
+    # Performance metrics
+    end_time = System.monotonic_time(:microsecond)
+    validation_duration = end_time - start_time
+
+    performance_metrics =
+      if include_performance do
+        %{
+          validation_duration_microseconds: validation_duration,
+          validation_duration_milliseconds: validation_duration / 1000,
+          memory_usage: :erlang.memory(:total),
+          complexity_analysis: enhanced_analysis.performance_metrics
+        }
+      else
+        nil
+      end
+
+    %{
+      validation_result: validation_result,
+      enhanced_schema: enhanced_analysis.json_schema,
+      schema_analysis: enhanced_analysis.features,
+      provider_compatibility: enhanced_analysis.llm_compatibility,
+      performance_metrics: performance_metrics,
+      dspy_analysis: dspy_analysis,
+      recommendations: enhanced_analysis.recommendations,
+      generated_at: DateTime.utc_now()
+    }
+  end
+
+  # Private helper functions for Phase 6 enhancements
+
+  @spec determine_target_type(module() | Runtime.DynamicSchema.t() | Runtime.EnhancedSchema.t()) ::
+          :compiled_schema | :dynamic_schema | :enhanced_schema | :type_specification
+  defp determine_target_type(target) when is_atom(target) do
+    if function_exported?(target, :__schema__, 1) do
+      :compiled_schema
+    else
+      :type_specification
+    end
+  end
+
+  defp determine_target_type(%Elixact.Runtime.DynamicSchema{}), do: :dynamic_schema
+  defp determine_target_type(%Elixact.Runtime.EnhancedSchema{}), do: :enhanced_schema
+
+  @spec extract_enhanced_features(
+          module()
+          | Runtime.DynamicSchema.t()
+          | Runtime.EnhancedSchema.t()
+        ) :: %{
+          struct_support: boolean(),
+          model_validators: non_neg_integer(),
+          computed_fields: non_neg_integer()
+        }
+  defp extract_enhanced_features(target) when is_atom(target) do
+    if function_exported?(target, :__schema__, 1) do
+      %{
+        struct_support:
+          function_exported?(target, :__struct_enabled__?, 0) and target.__struct_enabled__?(),
+        model_validators: length(target.__schema__(:model_validators) || []),
+        computed_fields: length(target.__schema__(:computed_fields) || [])
+      }
+    else
+      %{struct_support: false, model_validators: 0, computed_fields: 0}
+    end
+  end
+
+  defp extract_enhanced_features(%Elixact.Runtime.EnhancedSchema{} = schema) do
+    %{
+      struct_support: false,
+      model_validators: length(schema.model_validators),
+      computed_fields: length(schema.computed_fields)
+    }
+  end
+
+  defp extract_enhanced_features(_) do
+    %{struct_support: false, model_validators: 0, computed_fields: 0}
+  end
+
   # Private helper functions
 
   @spec validate_dynamic_schema_with_coercion(DynamicSchema.t(), map(), keyword()) ::

@@ -490,6 +490,256 @@ defmodule Elixact.Config do
     Builder.new()
   end
 
+  @doc """
+  Creates a configuration optimized for Phase 6 enhanced features.
+
+  Phase 6 Enhancement: Configuration that supports all new features and LLM optimizations.
+
+  ## Parameters
+    * `opts` - Configuration options with Phase 6 enhancements
+
+  ## Phase 6 Options
+    * `:llm_provider` - Target LLM provider for optimization (:openai, :anthropic, :generic)
+    * `:dspy_compatible` - Ensure DSPy compatibility (default: false)
+    * `:enhanced_validation` - Enable enhanced validation pipeline (default: true)
+    * `:include_metadata` - Include enhanced metadata in schemas (default: true)
+    * `:performance_mode` - Optimize for performance (:speed, :memory, :balanced)
+
+  ## Examples
+
+      iex> config = Elixact.Config.create_enhanced(%{
+      ...>   llm_provider: :openai,
+      ...>   dspy_compatible: true,
+      ...>   performance_mode: :balanced
+      ...> })
+      %Elixact.Config{...}
+  """
+  @spec create_enhanced(map() | keyword()) :: t()
+  def create_enhanced(opts \\ []) do
+    opts_map =
+      case opts do
+        map when is_map(map) -> map
+        keyword when is_list(keyword) -> Map.new(keyword)
+      end
+
+    # Extract Phase 6 specific options
+    llm_provider = Map.get(opts_map, :llm_provider, :generic)
+    dspy_compatible = Map.get(opts_map, :dspy_compatible, false)
+    enhanced_validation = Map.get(opts_map, :enhanced_validation, true)
+    _include_metadata = Map.get(opts_map, :include_metadata, true)
+    performance_mode = Map.get(opts_map, :performance_mode, :balanced)
+
+    # Build base configuration based on provider and requirements
+    base_config = build_provider_optimized_config(llm_provider, dspy_compatible)
+
+    # Apply performance optimizations
+    performance_config = apply_performance_optimizations(base_config, performance_mode)
+
+    # Apply enhanced validation settings
+    enhanced_config = apply_enhanced_validation_settings(performance_config, enhanced_validation)
+
+    # Merge with user-provided options (user options take precedence)
+    user_opts =
+      Map.drop(opts_map, [
+        :llm_provider,
+        :dspy_compatible,
+        :enhanced_validation,
+        :include_metadata,
+        :performance_mode
+      ])
+
+    final_config = Map.merge(enhanced_config, user_opts)
+
+    create(final_config)
+  end
+
+  @doc """
+  Creates a preset configuration for DSPy integration.
+
+  Phase 6 Enhancement: Specialized configuration for DSPy patterns.
+
+  ## Parameters
+    * `dspy_mode` - DSPy usage pattern (:signature, :chain_of_thought, :input_output, :general)
+    * `opts` - Additional configuration options
+
+  ## Examples
+
+      iex> config = Elixact.Config.for_dspy(:signature, provider: :openai)
+      %Elixact.Config{strict: true, extra: :forbid, ...}
+  """
+  @spec for_dspy(:signature | :chain_of_thought | :input_output | :general, keyword()) :: t()
+  def for_dspy(dspy_mode, opts \\ []) do
+    provider = Keyword.get(opts, :provider, :openai)
+
+    base_config =
+      case dspy_mode do
+        :signature ->
+          %{
+            strict: true,
+            extra: :forbid,
+            coercion: :safe,
+            validate_assignment: true,
+            case_sensitive: true,
+            error_format: :detailed,
+            use_enum_values: true
+          }
+
+        :chain_of_thought ->
+          %{
+            strict: true,
+            extra: :forbid,
+            coercion: :safe,
+            validate_assignment: true,
+            case_sensitive: true,
+            error_format: :detailed,
+            # Simpler unions for better reasoning
+            max_anyof_union_len: 2
+          }
+
+        :input_output ->
+          %{
+            strict: true,
+            extra: :forbid,
+            # More flexible input processing
+            coercion: :aggressive,
+            validate_assignment: false,
+            case_sensitive: false,
+            error_format: :simple
+          }
+
+        :general ->
+          %{
+            strict: true,
+            extra: :forbid,
+            coercion: :safe,
+            validate_assignment: true,
+            error_format: :detailed
+          }
+
+        _ ->
+          raise ArgumentError, "Unknown DSPy mode: #{inspect(dspy_mode)}"
+      end
+
+    # Apply provider-specific optimizations
+    provider_optimized = apply_dspy_provider_optimizations(base_config, provider)
+
+    # Merge with user options
+    final_config = Map.merge(provider_optimized, Map.new(opts))
+
+    create(final_config)
+  end
+
+  # Private helper functions for Phase 6 enhancements
+
+  @spec build_provider_optimized_config(atom(), boolean()) :: map()
+  defp build_provider_optimized_config(provider, dspy_compatible) do
+    base =
+      case provider do
+        :openai ->
+          %{
+            strict: true,
+            extra: :forbid,
+            coercion: :safe,
+            validate_assignment: true,
+            error_format: :detailed,
+            use_enum_values: true
+          }
+
+        :anthropic ->
+          %{
+            strict: true,
+            extra: :forbid,
+            coercion: :safe,
+            validate_assignment: true,
+            error_format: :detailed,
+            case_sensitive: true
+          }
+
+        :generic ->
+          %{
+            strict: false,
+            extra: :allow,
+            coercion: :safe,
+            validate_assignment: false,
+            error_format: :simple
+          }
+
+        _ ->
+          %{
+            strict: false,
+            extra: :allow,
+            coercion: :safe,
+            error_format: :simple
+          }
+      end
+
+    if dspy_compatible do
+      # Ensure DSPy compatibility
+      base
+      |> Map.put(:strict, true)
+      |> Map.put(:extra, :forbid)
+      |> Map.put(:use_enum_values, true)
+      |> Map.put(:max_anyof_union_len, 3)
+    else
+      base
+    end
+  end
+
+  @spec apply_performance_optimizations(map(), atom()) :: map()
+  defp apply_performance_optimizations(config, performance_mode) do
+    case performance_mode do
+      :speed ->
+        config
+        |> Map.put(:validate_assignment, false)
+        |> Map.put(:error_format, :minimal)
+        # Skip coercion for speed
+        |> Map.put(:coercion, :none)
+
+      :memory ->
+        config
+        |> Map.put(:error_format, :minimal)
+        # Reduce memory usage
+        |> Map.put(:max_anyof_union_len, 2)
+
+      :balanced ->
+        config
+        |> Map.put(:error_format, :simple)
+        |> Map.put(:coercion, :safe)
+
+      _ ->
+        config
+    end
+  end
+
+  @spec apply_enhanced_validation_settings(map(), boolean()) :: map()
+  defp apply_enhanced_validation_settings(config, enhanced_validation) do
+    if enhanced_validation do
+      config
+      |> Map.put(:validate_assignment, true)
+      |> Map.put(:error_format, :detailed)
+    else
+      config
+    end
+  end
+
+  @spec apply_dspy_provider_optimizations(map(), atom()) :: map()
+  defp apply_dspy_provider_optimizations(config, provider) do
+    case provider do
+      :openai ->
+        config
+        |> Map.put(:frozen, true)
+        |> Map.put(:use_enum_values, true)
+
+      :anthropic ->
+        config
+        |> Map.put(:case_sensitive, true)
+        |> Map.put(:allow_population_by_field_name, false)
+
+      _ ->
+        config
+    end
+  end
+
   # Private helper functions
 
   @spec validate_option_values!(map()) :: :ok

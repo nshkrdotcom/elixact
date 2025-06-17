@@ -14,5 +14,7 @@
   # Extra range warning for validate_wrapped/4 due to try/rescue always returning a tuple
   ~r/lib\/elixact\/enhanced_validator\.ex:125.*extra_range/,
   # The type specification has too many types for the function.
-  {"lib/elixact/enhanced_validator.ex", :extra_range, 125}
+  {"lib/elixact/enhanced_validator.ex", :extra_range, 125},
+  # Pattern match coverage warning for catch-all in determine_schema_type - needed for test compatibility
+  ~r/lib\/elixact\/json_schema\/enhanced_resolver\.ex:.*pattern_match_cov.*The pattern.*can never match/
 ]
