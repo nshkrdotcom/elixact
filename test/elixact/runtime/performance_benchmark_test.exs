@@ -264,6 +264,7 @@ defmodule Elixact.Runtime.PerformanceBenchmarkTest do
              "Complex enhanced schema JSON generation is #{complex_ratio}x slower"
     end
 
+    @tag :performance
     test "memory usage comparison" do
       # Test memory usage of different schema types
       fields = [
