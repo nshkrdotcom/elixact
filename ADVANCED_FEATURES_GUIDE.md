@@ -1,12 +1,13 @@
 # Advanced Features Guide
 
-This guide covers Elixact's advanced features: model validators, computed fields, enhanced runtime schemas, and sophisticated validation patterns.
+This guide covers Elixact's advanced features: model validators, computed fields, enhanced runtime schemas, root schema validation, and sophisticated validation patterns.
 
 ## Table of Contents
 
 - [Model Validators](#model-validators)
 - [Computed Fields](#computed-fields) 
 - [Enhanced Runtime Schemas](#enhanced-runtime-schemas)
+- [Root Schema Validation](#root-schema-validation)
 - [Advanced JSON Schema Features](#advanced-json-schema-features)
 - [Configuration System](#configuration-system)
 - [Performance Optimization](#performance-optimization)
@@ -386,6 +387,158 @@ complete_schema = Elixact.Runtime.EnhancedSchema.add_computed_field(
   :string,
   computation_function
 )
+```
+
+## Root Schema Validation
+
+Root schemas allow validation of non-dictionary types at the top level, similar to Pydantic's RootModel. This is particularly useful when your data structure is not an object/map but an array, primitive, or other type.
+
+### Basic Root Schema Usage
+
+```elixir
+# Validate arrays of primitives
+defmodule TagListSchema do
+  use Elixact.RootSchema, root: {:array, :string}
+end
+
+{:ok, ["tag1", "tag2"]} = TagListSchema.validate(["tag1", "tag2"])
+
+# Validate single values with constraints
+defmodule ScoreSchema do
+  use Elixact.RootSchema, 
+    root: {:type, :integer, [gteq: 0, lteq: 100]}
+end
+
+{:ok, 85} = ScoreSchema.validate(85)
+{:error, _} = ScoreSchema.validate(150)  # Out of range
+
+# Validate union types
+defmodule IdSchema do
+  use Elixact.RootSchema, root: {:union, [:string, :integer]}
+end
+
+{:ok, "user_123"} = IdSchema.validate("user_123")
+{:ok, 456} = IdSchema.validate(456)
+```
+
+### Root Schemas with Complex Types
+
+```elixir
+# Validate arrays of complex schemas
+defmodule UserSchema do
+  use Elixact
+
+  schema do
+    field :name, :string, required: true
+    field :email, :string, required: true
+    field :age, :integer, optional: true
+  end
+end
+
+defmodule UserListSchema do
+  use Elixact.RootSchema, root: {:array, UserSchema}
+end
+
+users = [
+  %{name: "John", email: "john@example.com", age: 30},
+  %{name: "Jane", email: "jane@example.com"}
+]
+
+{:ok, validated_users} = UserListSchema.validate(users)
+
+# Validate nested structures
+defmodule NestedDataSchema do
+  use Elixact.RootSchema, 
+    root: {:map, {:string, {:array, :integer}}}
+end
+
+data = %{"scores" => [85, 90, 78], "grades" => [88, 92, 85]}
+{:ok, validated_data} = NestedDataSchema.validate(data)
+```
+
+### Root Schema JSON Schema Generation
+
+Root schemas generate appropriate JSON Schema representations:
+
+```elixir
+# Array schema
+array_schema = TagListSchema.json_schema()
+# Returns: %{"type" => "array", "items" => %{"type" => "string"}}
+
+# Union schema  
+union_schema = IdSchema.json_schema()
+# Returns: %{"oneOf" => [%{"type" => "string"}, %{"type" => "integer"}]}
+
+# Complex nested schema
+nested_schema = NestedDataSchema.json_schema()
+# Returns: %{
+#   "type" => "object", 
+#   "additionalProperties" => %{
+#     "type" => "array", 
+#     "items" => %{"type" => "integer"}
+#   }
+# }
+```
+
+### Integration with Existing Features
+
+Root schemas work seamlessly with other Elixact features:
+
+```elixir
+# With TypeAdapter
+adapter = Elixact.TypeAdapter.create({:array, :string})
+root_schema = TagListSchema
+
+data = ["tag1", "tag2", "tag3"]
+
+# Both validate the same way
+{:ok, result1} = Elixact.TypeAdapter.Instance.validate(adapter, data)
+{:ok, result2} = root_schema.validate(data)
+assert result1 == result2
+
+# With enhanced validation and coercion
+defmodule FlexibleNumberListSchema do
+  use Elixact.RootSchema, root: {:array, :integer}
+end
+
+# Coercion works with root schemas too
+config = Elixact.Config.create(coercion: :safe)
+mixed_data = ["1", "2", "3"]  # Strings that can be coerced
+
+{:ok, [1, 2, 3]} = Elixact.EnhancedValidator.validate(
+  FlexibleNumberListSchema, 
+  mixed_data, 
+  config: config
+)
+```
+
+### When to Use Root Schemas
+
+Root schemas are ideal for:
+
+1. **API endpoints that return arrays**: When your API returns a list of items directly
+2. **LLM outputs**: When language models return arrays or single values
+3. **Configuration files**: When config is a single value or array
+4. **Data transformation**: When you need to validate intermediate results
+5. **Microservice communication**: When services exchange simple data structures
+
+```elixir
+# API endpoint returning array of strings
+defmodule TagsEndpointSchema do
+  use Elixact.RootSchema, root: {:array, :string}
+end
+
+# LLM classification output
+defmodule SentimentSchema do
+  use Elixact.RootSchema, 
+    root: {:type, :string, [choices: ["positive", "negative", "neutral"]]}
+end
+
+# Configuration value
+defmodule PortConfigSchema do
+  use Elixact.RootSchema, 
+    root: {:type, :integer, [gteq: 1024, lteq: 65535]}
+end
 ```
 
 ## Advanced JSON Schema Features

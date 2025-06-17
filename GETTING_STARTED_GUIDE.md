@@ -24,6 +24,7 @@ Elixact provides multiple approaches to data validation:
 2. **Runtime schemas** - Created dynamically from field definitions
 3. **TypeAdapter** - Direct type validation without schemas
 4. **Wrapper models** - Temporary single-field validation
+5. **Root schemas** - Validate non-dictionary types at the root level
 
 ## Your First Schema
 
@@ -324,6 +325,53 @@ data = %{name: "John", age: "30", email: "john@example.com"}
 {:ok, validated} = Elixact.Wrapper.validate_multiple(wrappers, data)
 ```
 
+## Root Schema Validation
+
+Validate non-dictionary types at the root level (similar to Pydantic's RootModel):
+
+```elixir
+# Validate an array of integers
+defmodule NumberListSchema do
+  use Elixact.RootSchema, root: {:array, :integer}
+end
+
+{:ok, [1, 2, 3]} = NumberListSchema.validate([1, 2, 3])
+{:error, _} = NumberListSchema.validate(["not", "numbers"])
+
+# Validate a string with format constraints
+defmodule EmailSchema do
+  use Elixact.RootSchema, 
+    root: {:type, :string, [format: ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/]}
+end
+
+{:ok, "user@example.com"} = EmailSchema.validate("user@example.com")
+{:error, _} = EmailSchema.validate("invalid-email")
+
+# Validate union types
+defmodule IdSchema do
+  use Elixact.RootSchema, root: {:union, [:string, :integer]}
+end
+
+{:ok, "user_123"} = IdSchema.validate("user_123")
+{:ok, 456} = IdSchema.validate(456)
+{:error, _} = IdSchema.validate(3.14)  # float not allowed
+
+# Validate arrays of complex schemas
+defmodule UserListSchema do
+  use Elixact.RootSchema, root: {:array, UserSchema}
+end
+
+users = [
+  %{name: "John", email: "john@example.com"},
+  %{name: "Jane", email: "jane@example.com"}
+]
+{:ok, validated_users} = UserListSchema.validate(users)
+
+# Generate JSON Schema
+json_schema = NumberListSchema.json_schema()
+# Returns: %{"type" => "array", "items" => %{"type" => "integer"}}
+```
+
 ## Configuration and Behavior Control
 
 Control validation behavior with configurations:
@@ -581,6 +629,7 @@ config = Elixact.Config.create(coercion: :safe)
    - Runtime schemas for dynamic validation
    - TypeAdapter for simple types
    - Wrapper for single values
+   - RootSchema for non-dictionary root types
 4. **Batch validation**: Use `validate_many` for multiple items
 5. **Cache JSON schemas**: Generate once, reuse multiple times
 

@@ -24,6 +24,7 @@ Elixact provides comprehensive support for LLM integration through:
 - **DSPy integration patterns** for structured programming
 - **Field metadata** for DSPy-style annotations and LLM hints
 - **Validation pipelines** for multi-step LLM workflows
+- **Root schema validation** for non-dictionary LLM outputs
 
 ## Structured Output Validation
 
@@ -149,6 +150,58 @@ fields_config = [
   llm_response, 
   fields_config
 )
+```
+
+### Root Schema for LLM List Outputs
+
+Sometimes LLMs return arrays or other non-dictionary types at the root level:
+
+```elixir
+# Validate an array of extracted entities
+defmodule EntityListSchema do
+  use Elixact.RootSchema, 
+    root: {:array, {:type, :string, [min_length: 1]}}
+end
+
+# LLM returns: ["Apple Inc.", "Microsoft", "Google"]
+llm_entities = ["Apple Inc.", "Microsoft", "Google"]
+{:ok, validated_entities} = EntityListSchema.validate(llm_entities)
+
+# Validate an array of structured entities
+defmodule StructuredEntitySchema do
+  use Elixact
+
+  schema do
+    field :name, :string, required: true, min_length: 1
+    field :type, :string, choices: ["PERSON", "ORG", "LOCATION"]
+    field :confidence, :float, gteq: 0.0, lteq: 1.0
+  end
+end
+
+defmodule StructuredEntityListSchema do
+  use Elixact.RootSchema, root: {:array, StructuredEntitySchema}
+end
+
+# LLM returns structured entities
+llm_structured_entities = [
+  %{"name" => "Apple Inc.", "type" => "ORG", "confidence" => 0.95},
+  %{"name" => "Tim Cook", "type" => "PERSON", "confidence" => 0.87}
+]
+
+{:ok, validated_structured} = StructuredEntityListSchema.validate(llm_structured_entities)
+
+# Validate classification results (single value)
+defmodule ClassificationSchema do
+  use Elixact.RootSchema, 
+    root: {:type, :string, [choices: ["positive", "negative", "neutral"]]}
+end
+
+# LLM returns: "positive"
+{:ok, "positive"} = ClassificationSchema.validate("positive")
+
+# Generate JSON Schema for LLM prompts
+entity_list_schema = EntityListSchema.json_schema()
+# Returns: %{"type" => "array", "items" => %{"type" => "string", "minLength" => 1}}
 ```
 
 ## DSPy Integration Patterns

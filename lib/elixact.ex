@@ -5,6 +5,9 @@ defmodule Elixact do
   It provides a DSL for defining schemas with rich metadata, validation rules,
   and JSON Schema generation capabilities.
 
+  For validating non-dictionary types at the root level (similar to Pydantic's RootModel),
+  see `Elixact.RootSchema`.
+
   ## Struct Pattern Support
 
   Elixact now supports generating structs alongside validation schemas:

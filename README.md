@@ -15,7 +15,7 @@ Elixact provides a comprehensive toolset for data validation, serialization, and
 - 🏗️ **Struct Support**: Optional struct generation for type-safe data structures with automatic serialization
 - 🔧 **Model Validators**: Cross-field validation and data transformation after field validation
 - ⚡ **Computed Fields**: Derive additional fields from validated data automatically
-- 🎨 **Pydantic-Inspired Patterns**: Support for `create_model`, `TypeAdapter`, and `Wrapper` patterns
+- 🎨 **Pydantic-Inspired Patterns**: Support for `create_model`, `TypeAdapter`, `Wrapper`, and `RootModel` patterns
 - 🔍 **Advanced Validation**: Rich constraints plus custom validation functions
 - 🔄 **Type Coercion**: Automatic and configurable type coercion
 - 📊 **Advanced JSON Schema**: Generate optimized JSON Schema for LLM providers (OpenAI, Anthropic)
@@ -204,6 +204,43 @@ wrappers = Elixact.Wrapper.create_multiple_wrappers([
 data = %{name: "Test", age: "25", score: "0.95"}  # All strings
 {:ok, validated} = Elixact.Wrapper.validate_multiple(wrappers, data)
 # All values are properly coerced to their target types
+```
+
+### Root Schema for Non-Dictionary Validation
+
+Validate non-dictionary types at the root level (similar to Pydantic's RootModel):
+
+```elixir
+# Validate an array of integers
+defmodule IntegerListSchema do
+  use Elixact.RootSchema, root: {:array, :integer}
+end
+
+{:ok, [1, 2, 3]} = IntegerListSchema.validate([1, 2, 3])
+
+# Validate a string with constraints
+defmodule EmailSchema do
+  use Elixact.RootSchema, 
+    root: {:type, :string, [format: ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/]}
+end
+
+{:ok, "user@example.com"} = EmailSchema.validate("user@example.com")
+
+# Validate union types
+defmodule StringOrNumberSchema do
+  use Elixact.RootSchema, root: {:union, [:string, :integer]}
+end
+
+{:ok, "hello"} = StringOrNumberSchema.validate("hello")
+{:ok, 42} = StringOrNumberSchema.validate(42)
+
+# Validate arrays of complex schemas
+defmodule UserListSchema do
+  use Elixact.RootSchema, root: {:array, UserSchema}
+end
+
+users = [%{name: "John", email: "john@example.com"}]
+{:ok, validated_users} = UserListSchema.validate(users)
 ```
 
 ## 🏗️ Core Concepts
