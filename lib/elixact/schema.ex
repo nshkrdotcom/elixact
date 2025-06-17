@@ -426,6 +426,19 @@ defmodule Elixact.Schema do
     required = Keyword.get(opts_without_do, :required, true)
     optional = Keyword.get(opts_without_do, :optional, false)
     default_value = Keyword.get(opts_without_do, :default)
+    extra_opts = Keyword.get(opts_without_do, :extra, %{})
+
+    # Handle AST for map literals passed as options
+    evaluated_extra_opts =
+      case extra_opts do
+        {:%{}, _, _} = ast ->
+          # This is a map literal AST, evaluate it
+          {map, _} = Code.eval_quoted(ast)
+          map
+
+        other ->
+          other
+      end
 
     # Determine if field is required (required: true takes precedence over optional: true)
     # Fields with default values should be optional unless explicitly marked as required
@@ -446,7 +459,8 @@ defmodule Elixact.Schema do
         name: unquote(name),
         type: unquote(handle_type(type)),
         required: unquote(is_required),
-        constraints: []
+        constraints: [],
+        extra: unquote(Macro.escape(evaluated_extra_opts))
       }
 
       # Apply default if provided
@@ -486,7 +500,8 @@ defmodule Elixact.Schema do
         name: unquote(name),
         type: unquote(handle_type(type)),
         required: true,
-        constraints: []
+        constraints: [],
+        extra: %{}
       }
 
       # Create a variable accessible across all nested macros in this field block
@@ -662,6 +677,41 @@ defmodule Elixact.Schema do
         var!(field_meta)
         |> Map.put(:default, unquote(value))
         |> Map.put(:required, false)
+    end
+  end
+
+  @doc """
+  Sets arbitrary extra metadata for the field.
+
+  This allows storing custom key-value pairs in the field metadata, 
+  which is particularly useful for DSPy-style field type annotations
+  and other framework-specific metadata.
+
+  ## Parameters
+    * `key` - String key for the metadata
+    * `value` - The metadata value
+
+  ## Examples
+
+      field :answer, :string do
+        extra("__dspy_field_type", "output")
+        extra("prefix", "Answer:")
+      end
+
+      field :question, :string do
+        extra("__dspy_field_type", "input")
+      end
+
+      # Can also be used with map
+      field :data, :string, extra: %{"custom_key" => "custom_value"}
+  """
+  @spec extra(String.t(), term()) :: Macro.t()
+  defmacro extra(key, value) do
+    quote do
+      current_extra = Map.get(var!(field_meta), :extra, %{})
+
+      var!(field_meta) =
+        Map.put(var!(field_meta), :extra, Map.put(current_extra, unquote(key), unquote(value)))
     end
   end
 

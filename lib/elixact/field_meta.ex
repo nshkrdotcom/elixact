@@ -16,7 +16,8 @@ defmodule Elixact.FieldMeta do
     :required,
     :optional,
     :default,
-    :constraints
+    :constraints,
+    extra: %{}
   ]
 
   @type t :: %__MODULE__{
@@ -28,7 +29,8 @@ defmodule Elixact.FieldMeta do
           required: boolean(),
           optional: boolean() | nil,
           default: term() | nil,
-          constraints: [term()] | nil
+          constraints: [term()] | nil,
+          extra: %{String.t() => term()}
         }
 
   @doc """
