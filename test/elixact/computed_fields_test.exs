@@ -585,13 +585,13 @@ defmodule Elixact.ComputedFieldsTest do
     test "can generate separate input and output schemas" do
       # This functionality will be implemented in a future phase
       # {input_schema, output_schema} = Elixact.JsonSchema.input_output_schemas(UserSchema)
-      # 
+      #
       # input_properties = input_schema["properties"]
       # output_properties = output_schema["properties"]
-      # 
+      #
       # # Input schema should not have computed fields
       # refute Map.has_key?(input_properties, "full_name")
-      # 
+      #
       # # Output schema should have computed fields
       # assert Map.has_key?(output_properties, "full_name")
       # assert output_properties["full_name"]["readOnly"] == true

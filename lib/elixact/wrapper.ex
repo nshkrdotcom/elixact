@@ -565,20 +565,18 @@ defmodule Elixact.Wrapper do
   defp should_treat_map_as_value?(_data, nil), do: false
 
   defp should_treat_map_as_value?(_data, field_meta) do
-    is_map_compatible_type?(field_meta.type)
+    map_compatible_type?(field_meta.type)
   end
 
-  @spec is_map_compatible_type?(term()) :: boolean()
-  defp is_map_compatible_type?(type) do
+  @spec map_compatible_type?(term()) :: boolean()
+  defp map_compatible_type?(type) do
     case type do
-      # Map types
-      {:map, _, _} -> true
+      # Map and any types
+      type when type in [:map, :any] -> true
+      {:type, type, _} when type in [:map, :any] -> true
+      # Map with additional type info
       {:map, _} -> true
-      {:type, :map, _} -> true
-      :map -> true
-      # Any types
-      {:type, :any, _} -> true
-      :any -> true
+      {:map, _, _} -> true
       # Reference types (schemas accept map data)
       {:ref, _} -> true
       {:type, :ref, _} -> true

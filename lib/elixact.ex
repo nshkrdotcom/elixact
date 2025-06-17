@@ -374,8 +374,8 @@ defmodule Elixact do
             all_fields: [:first_name, :last_name, :email, :full_name, :email_domain]
           }
       """
-      @spec __schema_info__() :: map()
-      def __schema_info__() do
+      @spec __schema_info__ :: map()
+      def __schema_info__ do
         regular_fields = __schema__(:fields) |> Enum.map(fn {name, _} -> name end)
         computed_fields = __schema__(:computed_fields) |> Enum.map(fn {name, _} -> name end)
         model_validators = __schema__(:model_validators)
