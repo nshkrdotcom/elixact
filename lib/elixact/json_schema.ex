@@ -188,7 +188,7 @@ defmodule Elixact.JsonSchema do
     # Add computed field specific metadata for documentation
     base =
       Map.put(base, "x-computed-field", %{
-        "function" => Elixact.ComputedFieldMeta.function_reference(computed_field_meta),
+        "function" => format_computed_field_function_reference(computed_field_meta),
         "module" => computed_field_meta.module,
         "function_name" => computed_field_meta.function_name
       })
@@ -323,4 +323,23 @@ defmodule Elixact.JsonSchema do
   defp maybe_update_required(schema, nil), do: schema
   defp maybe_update_required(schema, []), do: Map.delete(schema, "required")
   defp maybe_update_required(schema, required), do: Map.put(schema, "required", required)
+
+  # Helper function for enhanced computed field function reference formatting
+  @spec format_computed_field_function_reference(Elixact.ComputedFieldMeta.t()) :: String.t()
+  defp format_computed_field_function_reference(computed_field_meta) do
+    module_name =
+      computed_field_meta.module
+      |> to_string()
+      |> String.replace_prefix("Elixir.", "")
+
+    function_str = Atom.to_string(computed_field_meta.function_name)
+
+    # Check if it's a generated function name
+    if String.starts_with?(function_str, "__generated_computed_field_") do
+      field_name = computed_field_meta.name
+      "#{module_name}.<anonymous computed field :#{field_name}>/1"
+    else
+      "#{module_name}.#{function_str}/1"
+    end
+  end
 end

@@ -12,6 +12,18 @@ defmodule Elixact.StructValidator do
   2. Model validation (Phase 2)
   3. Computed field execution (Phase 3)
   4. Struct creation (Phase 1)
+
+  ## Phase 4 Enhancement: Anonymous Function Support
+
+  Enhanced to properly handle both named functions and generated anonymous functions
+  in model validators and computed fields. The validator can now execute:
+
+  1. Named function model validators: `{MyModule, :validate_something}`
+  2. Generated anonymous function validators: `{MyModule, :__generated_model_validator_123_456}`
+  3. Named function computed fields: `{field_name, %ComputedFieldMeta{function_name: :my_function}}`
+  4. Generated anonymous computed fields: `{field_name, %ComputedFieldMeta{function_name: :__generated_computed_field_name_123_456}}`
+
+  All function types are handled uniformly through the same execution pipeline.
   """
 
   alias Elixact.{Error, Validator}
@@ -37,6 +49,8 @@ defmodule Elixact.StructValidator do
 
   ## Model Validator Execution
   Model validators are executed in the order they are declared in the schema.
+  Note: The validators are stored in reverse order due to Elixir's accumulate attribute behavior,
+  but they are reversed back during execution to maintain declaration order.
   If any model validator returns an error, execution stops and the error is returned.
   Model validators can transform data by returning modified data in the success case.
 
@@ -305,7 +319,8 @@ defmodule Elixact.StructValidator do
   @spec get_model_validators(module()) :: [{module(), atom()}]
   defp get_model_validators(schema_module) do
     if function_exported?(schema_module, :__schema__, 1) do
-      schema_module.__schema__(:model_validators) || []
+      # Reverse the list to process model validators in the order they were defined
+      (schema_module.__schema__(:model_validators) || []) |> Enum.reverse()
     else
       []
     end
@@ -320,7 +335,7 @@ defmodule Elixact.StructValidator do
         {:ok, new_data}
 
       {:error, reason} when is_binary(reason) ->
-        error = Error.new(path, :model_validation, reason)
+        error = create_model_validator_error(module, function_name, reason, path)
         {:error, [error]}
 
       {:error, %Error{} = error} ->
@@ -335,22 +350,28 @@ defmodule Elixact.StructValidator do
 
       other ->
         # Invalid return format from model validator
+        function_display = format_function_display(module, function_name)
+
         error_msg =
-          "Model validator #{module}.#{function_name}/1 returned invalid format: #{inspect(other)}. Expected {:ok, data} or {:error, reason}"
+          "Model validator #{function_display} returned invalid format: #{inspect(other)}. " <>
+            "Expected {:ok, data} or {:error, reason}"
 
         error = Error.new(path, :model_validation, error_msg)
         {:error, [error]}
     end
   rescue
     _e in UndefinedFunctionError ->
-      error_msg = "Model validator function #{module}.#{function_name}/1 is not defined"
+      function_display = format_function_display(module, function_name)
+      error_msg = "Model validator function #{function_display} is not defined"
       error = Error.new(path, :model_validation, error_msg)
       {:error, [error]}
 
     e ->
       # Catch any other exceptions during model validator execution
+      function_display = format_function_display(module, function_name)
+
       error_msg =
-        "Model validator #{module}.#{function_name}/1 execution failed: #{Exception.message(e)}"
+        "Model validator #{function_display} execution failed: #{Exception.message(e)}"
 
       error = Error.new(path, :model_validation, error_msg)
       {:error, [error]}
@@ -508,7 +529,7 @@ defmodule Elixact.StructValidator do
 
         other ->
           # Invalid return format from computed field function
-          function_ref = Elixact.ComputedFieldMeta.function_reference(computed_field_meta)
+          function_ref = format_computed_field_function_reference(computed_field_meta)
 
           error_msg =
             "Computed field function #{function_ref} returned invalid format: #{inspect(other)}. " <>
@@ -519,14 +540,14 @@ defmodule Elixact.StructValidator do
       end
     rescue
       _e in UndefinedFunctionError ->
-        function_ref = Elixact.ComputedFieldMeta.function_reference(computed_field_meta)
+        function_ref = format_computed_field_function_reference(computed_field_meta)
         error_msg = "Computed field function #{function_ref} is not defined"
         error = Error.new(field_path, :computed_field, error_msg)
         {:error, [error]}
 
       e ->
         # Catch any other exceptions during computed field execution
-        function_ref = Elixact.ComputedFieldMeta.function_reference(computed_field_meta)
+        function_ref = format_computed_field_function_reference(computed_field_meta)
 
         error_msg =
           "Computed field function #{function_ref} execution failed: #{Exception.message(e)}"
@@ -582,7 +603,7 @@ defmodule Elixact.StructValidator do
          computed_field_meta
        ) do
     # Enhance error message to include computed field context
-    function_ref = Elixact.ComputedFieldMeta.function_reference(computed_field_meta)
+    function_ref = format_computed_field_function_reference(computed_field_meta)
 
     enhanced_message =
       if String.contains?(error.message, function_ref) do
@@ -599,5 +620,63 @@ defmodule Elixact.StructValidator do
       end
 
     %{error | path: updated_path, message: enhanced_message}
+  end
+
+  # Private helper functions for enhanced error reporting
+
+  @spec create_model_validator_error(module(), atom(), String.t(), [
+          atom() | String.t() | integer()
+        ]) :: Error.t()
+  defp create_model_validator_error(module, function_name, reason, path) do
+    function_display = format_function_display(module, function_name)
+    message = format_model_validator_error_message(function_display, reason)
+    Error.new(path, :model_validation, message)
+  end
+
+  @spec format_function_display(module(), atom()) :: String.t()
+  defp format_function_display(module, function_name) do
+    module_name = module |> to_string() |> String.replace_prefix("Elixir.", "")
+    function_str = Atom.to_string(function_name)
+
+    # Check if it's a generated function name
+    if String.starts_with?(function_str, "__generated_") do
+      # Extract the type from generated function name
+      case String.split(function_str, "_", parts: 4) do
+        ["", "generated", type, _rest] ->
+          "#{module_name}.<anonymous #{type}>/1"
+
+        _ ->
+          "#{module_name}.#{function_str}/1"
+      end
+    else
+      "#{module_name}.#{function_str}/1"
+    end
+  end
+
+  @spec format_computed_field_function_reference(Elixact.ComputedFieldMeta.t()) :: String.t()
+  defp format_computed_field_function_reference(computed_field_meta) do
+    module_name =
+      computed_field_meta.module
+      |> to_string()
+      |> String.replace_prefix("Elixir.", "")
+
+    function_str = Atom.to_string(computed_field_meta.function_name)
+
+    # Check if it's a generated function name
+    if String.starts_with?(function_str, "__generated_computed_field_") do
+      field_name = computed_field_meta.name
+      "#{module_name}.<anonymous computed field :#{field_name}>/1"
+    else
+      "#{module_name}.#{function_str}/1"
+    end
+  end
+
+  @spec format_model_validator_error_message(String.t(), String.t()) :: String.t()
+  defp format_model_validator_error_message(function_display, reason) do
+    if String.contains?(function_display, "<anonymous") do
+      "Anonymous model validator failed: #{reason}"
+    else
+      reason
+    end
   end
 end

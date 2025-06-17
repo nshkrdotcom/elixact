@@ -4,6 +4,40 @@ defmodule Elixact.Schema do
 
   This module provides macros and functions for defining structured data schemas
   with rich validation capabilities, type safety, and comprehensive error reporting.
+
+  ## Phase 4 Enhancement: Anonymous Function Support
+
+  Added support for inline anonymous functions in model validators and computed fields:
+
+      schema do
+        field :password, :string
+        field :password_confirmation, :string
+
+        # Named function (existing)
+        model_validator :validate_passwords_match
+
+        # Anonymous function (new)
+        model_validator fn input ->
+          if input.password == input.password_confirmation do
+            {:ok, input}
+          else
+            {:error, "passwords do not match"}
+          end
+        end
+
+        # Anonymous function with do-end block (new)
+        model_validator do
+          if input.password == input.password_confirmation do
+            {:ok, input}
+          else
+            {:error, "passwords do not match"}
+          end
+        end
+
+        computed_field :display_name, :string do
+          String.upcase(input.name)
+        end
+      end
   """
 
   alias Elixact.Types
@@ -13,6 +47,13 @@ defmodule Elixact.Schema do
           optional(:description) => String.t(),
           optional(:strict) => boolean()
         }
+
+  @type model_validator_ast ::
+          {:@, [{:context, Elixact.Schema} | {:imports, [...]}],
+           [{:model_validators, [...], [...]}]}
+          | {:__block__, [], [{:def, [...], [...]} | {:@, [...], [...]}]}
+
+  @type macro_ast :: term()
 
   @doc """
   Defines a new schema with optional description.
@@ -593,6 +634,38 @@ defmodule Elixact.Schema do
   end
 
   @doc """
+  Sets a default value for the field and marks it as optional.
+  The default value will be used if the field is omitted from input data.
+
+  ## Parameters
+    * `value` - The default value to use when the field is not provided
+
+  ## Examples
+
+      field :status, :string do
+        default("pending")
+      end
+
+      field :active, :boolean do
+        default(true)
+      end
+
+      field :retry_count, :integer do
+        default(0)
+        gteq(0)
+      end
+  """
+  @spec default(term()) :: Macro.t()
+  defmacro default(value) do
+    quote do
+      var!(field_meta) =
+        var!(field_meta)
+        |> Map.put(:default, unquote(value))
+        |> Map.put(:required, false)
+    end
+  end
+
+  @doc """
   Defines a computed field that generates a value based on validated data.
 
   Computed fields execute after field and model validation, generating additional
@@ -602,10 +675,11 @@ defmodule Elixact.Schema do
   ## Parameters
     * `name` - Field name (atom)
     * `type` - Field type specification (same as regular fields)
-    * `function_name` - Name of the function to call for computation (atom)
+    * `function_name` - Name of the function to call for computation (atom) or anonymous function
+    * `opts` - Optional keyword list with :description and :example (when using named function)
 
   ## Function Signature
-  The referenced function must accept one parameter (the validated data) and return:
+  The computation function must accept one parameter (the validated data) and return:
     * `{:ok, computed_value}` - computation succeeds
     * `{:error, message}` - computation fails with error message
     * `{:error, %Elixact.Error{}}` - computation fails with detailed error
@@ -619,7 +693,7 @@ defmodule Elixact.Schema do
 
   ## Examples
 
-      # Define a schema with computed fields
+      # Using named function
       defmodule UserSchema do
         use Elixact, define_struct: true
 
@@ -629,11 +703,11 @@ defmodule Elixact.Schema do
           field :email, :string, required: true
 
           computed_field :full_name, :string, :generate_full_name
-          computed_field :email_domain, :string, :extract_email_domain
-          computed_field :initials, :string, :create_initials
+          computed_field :email_domain, :string, :extract_email_domain,
+            description: "Domain part of the email address",
+            example: "example.com"
         end
 
-        # Computed field functions
         def generate_full_name(input) do
           {:ok, "\#{input.first_name} \#{input.last_name}"}
         end
@@ -642,25 +716,23 @@ defmodule Elixact.Schema do
           domain = input.email |> String.split("@") |> List.last()
           {:ok, domain}
         end
-
-        def create_initials(input) do
-          first_initial = String.first(input.first_name)
-          last_initial = String.first(input.last_name)
-          {:ok, "\#{first_initial}\#{last_initial}"}
-        end
       end
 
-      # Usage
-      {:ok, user} = UserSchema.validate(%{
-        first_name: "John",
-        last_name: "Doe",
-        email: "john@example.com"
-      })
+      # Using anonymous function
+      schema do
+        field :first_name, :string
+        field :last_name, :string
 
-      # Result includes computed fields
-      # user.full_name => "John Doe"
-      # user.email_domain => "example.com" 
-      # user.initials => "JD"
+        computed_field :full_name, :string, fn input ->
+          {:ok, "\#{input.first_name} \#{input.last_name}"}
+        end
+
+        computed_field :initials, :string, fn input ->
+          first = String.first(input.first_name)
+          last = String.first(input.last_name)
+          {:ok, "\#{first}\#{last}"}
+        end
+      end
 
   ## Error Handling
 
@@ -701,19 +773,19 @@ defmodule Elixact.Schema do
 
   When using `define_struct: true`, computed fields are included in the struct definition:
 
-      defstruct [:first_name, :last_name, :email, :full_name, :email_domain, :initials]
+      defstruct [:first_name, :last_name, :email, :full_name, :email_domain]
   """
-  @spec computed_field(atom(), term(), atom()) :: Macro.t()
+
+  @spec computed_field(atom(), term(), atom()) :: macro_ast
   defmacro computed_field(name, type, function_name)
            when is_atom(name) and is_atom(function_name) do
     quote do
-      # Validate that the field name is a valid atom
+      # Validate inputs
       unless is_atom(unquote(name)) and not is_nil(unquote(name)) do
         raise ArgumentError,
               "computed field name must be a non-nil atom, got: #{inspect(unquote(name))}"
       end
 
-      # Validate that the function name is a valid atom
       unless is_atom(unquote(function_name)) and not is_nil(unquote(function_name)) do
         raise ArgumentError,
               "computed field function name must be a non-nil atom, got: #{inspect(unquote(function_name))}"
@@ -733,34 +805,42 @@ defmodule Elixact.Schema do
     end
   end
 
-  @doc """
-  Defines a computed field with additional metadata like description and example.
+  @spec computed_field(atom(), term(), (map() ->
+                                          {:ok, term()} | {:error, String.t() | Elixact.Error.t()})) ::
+          macro_ast
+  defmacro computed_field(name, type, computation_fn) when is_atom(name) do
+    # Generate unique function name
+    function_name = generate_function_name("computed_field")
 
-  This version allows you to provide a description and example for the computed field,
-  which will be included in generated JSON schemas and documentation.
-
-  ## Parameters
-    * `name` - Field name (atom)
-    * `type` - Field type specification
-    * `function_name` - Name of the function to call for computation (atom)
-    * `opts` - Options for the computed field
-
-  ## Options
-    * `:description` - Description of the computed field
-    * `:example` - Example value for the computed field
-
-  ## Examples
-
-      schema do
-        field :first_name, :string, required: true
-        field :last_name, :string, required: true
-
-        computed_field :full_name, :string, :generate_full_name,
-          description: "User's full name combining first and last name",
-          example: "John Doe"
+    quote do
+      # Validate inputs
+      unless is_atom(unquote(name)) and not is_nil(unquote(name)) do
+        raise ArgumentError,
+              "computed field name must be a non-nil atom, got: #{inspect(unquote(name))}"
       end
-  """
-  @spec computed_field(atom(), term(), atom(), keyword()) :: Macro.t()
+
+      # Define the function with generated name
+      def unquote(function_name)(input) do
+        computation_fn = unquote(computation_fn)
+        computation_fn.(input)
+      end
+
+      # Create computed field metadata
+      computed_field_meta = %Elixact.ComputedFieldMeta{
+        name: unquote(name),
+        type: unquote(handle_type(type)),
+        function_name: unquote(function_name),
+        module: __MODULE__,
+        readonly: true
+      }
+
+      # Store the computed field metadata
+      @computed_fields {unquote(name), computed_field_meta}
+    end
+  end
+
+  @spec computed_field(atom(), term(), atom(), [{:description, String.t()} | {:example, term()}]) ::
+          macro_ast
   defmacro computed_field(name, type, function_name, opts)
            when is_atom(name) and is_atom(function_name) and is_list(opts) do
     description = Keyword.get(opts, :description)
@@ -795,76 +875,124 @@ defmodule Elixact.Schema do
   end
 
   @doc """
-  Sets a default value for the field and marks it as optional.
-  The default value will be used if the field is omitted from input data.
+  Defines a model-level validator that runs after field validation.
+
+  Model validators receive the validated data (as a map or struct) and can perform
+  cross-field validation, data transformation, or complex business logic validation.
 
   ## Parameters
-    * `value` - The default value to use when the field is not provided
+    * `function_name` - Name of the function to call for model validation (when using named function)
+    * `validator_fn` - Anonymous function that accepts validated data and returns result (when using anonymous function)
+    * `do` block - Block of code with implicit `input` variable (when using do-end block)
+
+  ## Function Signature
+  The validator must accept one parameter (the validated data) and return:
+    * `{:ok, data}` - validation succeeds, optionally with transformed data
+    * `{:error, message}` - validation fails with error message
+    * `{:error, %Elixact.Error{}}` - validation fails with detailed error
 
   ## Examples
 
-      field :status, :string do
-        default("pending")
+      defmodule UserSchema do
+        use Elixact, define_struct: true
+
+        schema do
+          field :password, :string, required: true
+          field :password_confirmation, :string, required: true
+
+          # Using named function
+          model_validator :validate_passwords_match
+
+          # Using anonymous function
+          model_validator fn input ->
+            if input.password == input.password_confirmation do
+              {:ok, input}
+            else
+              {:error, "passwords do not match"}
+            end
+          end
+
+          # Using do-end block with implicit input
+          model_validator do
+            if input.password == input.password_confirmation do
+              {:ok, input}
+            else
+              {:error, "passwords do not match"}
+            end
+          end
+        end
+
+        def validate_passwords_match(input) do
+          if input.password == input.password_confirmation do
+            {:ok, input}
+          else
+            {:error, "passwords do not match"}
+          end
+        end
       end
 
-      field :active, :boolean do
-        default(true)
+  ## Multiple Validators
+  Multiple model validators can be defined and will execute in the order they are declared:
+
+      schema do
+        field :username, :string, required: true
+        field :email, :string, required: true
+
+        model_validator :validate_username_unique
+        model_validator :validate_email_format
+        model_validator :send_welcome_email
       end
 
-      field :retry_count, :integer do
-        default(0)
-        gteq(0)
+  ## Data Transformation
+  Model validators can transform the data by returning modified data:
+
+      def normalize_email(input) do
+        normalized = %{input | email: String.downcase(input.email)}
+        {:ok, normalized}
       end
   """
-  @spec default(term()) :: Macro.t()
-  defmacro default(value) do
-    quote do
-      var!(field_meta) =
-        var!(field_meta)
-        |> Map.put(:default, unquote(value))
-        |> Map.put(:required, false)
-    end
-  end
 
-  # Handle type definitions
-  @spec handle_type(term()) :: Macro.t()
-  defp handle_type({:array, type}) do
-    quote do
-      Types.array(unquote(handle_type(type)))
-    end
-  end
-
-  # Handle map types
-  defp handle_type({:map, {key_type, value_type}}) do
-    normalized_key = handle_type(key_type)
-    normalized_value = handle_type(value_type)
+  @spec model_validator((map() -> {:ok, map()} | {:error, String.t() | Elixact.Error.t()})) ::
+          macro_ast
+  defmacro model_validator(validator_fn) when not is_atom(validator_fn) do
+    # Generate unique function name
+    function_name = generate_function_name("model_validator")
 
     quote do
-      Types.map(unquote(normalized_key), unquote(normalized_value))
-    end
-  end
-
-  defp handle_type({:union, types}) do
-    quote do
-      Types.union(unquote(types |> Enum.map(&handle_type/1)))
-    end
-  end
-
-  defp handle_type({:__aliases__, _, _} = module_alias) do
-    quote do
-      unquote(module_alias)
-    end
-  end
-
-  # Handle built-in types and references
-  defp handle_type(type) when is_atom(type) do
-    if type in [:string, :integer, :float, :boolean, :any, :atom, :map] do
-      quote do
-        Types.type(unquote(type))
+      # Define the function with generated name
+      def unquote(function_name)(input) do
+        validator_fn = unquote(validator_fn)
+        validator_fn.(input)
       end
-    else
-      # Assume it's a reference
-      {:ref, type}
+
+      # Register the generated function
+      @model_validators {__MODULE__, unquote(function_name)}
+    end
+  end
+
+  @spec model_validator(atom()) :: macro_ast
+  defmacro model_validator(function_name) when is_atom(function_name) do
+    quote do
+      @model_validators {__MODULE__, unquote(function_name)}
+    end
+  end
+
+  @spec model_validator(keyword()) :: macro_ast
+  defmacro model_validator(do: block) do
+    # Generate unique function name
+    function_name = generate_function_name("model_validator")
+
+    # Transform the block to inject the input parameter
+    transformed_block = inject_input_parameter(block)
+
+    quote do
+      # Define the function with generated name
+      def unquote(function_name)(input) do
+        unquote(transformed_block)
+      end
+
+      # Register the generated function
+      @model_validators {__MODULE__, unquote(function_name)}
     end
   end
 
@@ -980,66 +1108,74 @@ defmodule Elixact.Schema do
     end
   end
 
-  @doc """
-  Defines a model-level validator that runs after field validation.
+  # Private helper function for generating unique function names
+  @spec generate_function_name(<<_::64, _::_*8>>, nil) :: atom()
+  defp generate_function_name(prefix, suffix \\ nil) do
+    base_name = if suffix, do: "#{prefix}_#{suffix}", else: prefix
+    unique_id = System.unique_integer([:positive])
+    timestamp = System.system_time(:nanosecond)
 
-  Model validators receive the validated data (as a map or struct) and can perform
-  cross-field validation, data transformation, or complex business logic validation.
+    # Create a reasonably unique but readable function name
+    :"__generated_#{base_name}_#{unique_id}_#{timestamp}"
+  end
 
-  ## Parameters
-    * `function_name` - Name of the function to call for model validation
+  # Private helper function to inject input parameter into block
+  @spec inject_input_parameter(Macro.t()) :: Macro.t()
+  defp inject_input_parameter(block) do
+    # Use Macro.prewalk to traverse the AST and replace input references
+    Macro.prewalk(block, fn
+      # Replace bare :input atom references with a variable
+      {:input, meta, nil} ->
+        {:input, meta, Elixir}
 
-  ## Function Signature
-  The referenced function must accept one parameter (the validated data) and return:
-    * `{:ok, data}` - validation succeeds, optionally with transformed data
-    * `{:error, message}` - validation fails with error message
-    * `{:error, %Elixact.Error{}}` - validation fails with detailed error
+      {:input, meta, context} when context != nil ->
+        {:input, meta, Elixir}
 
-  ## Examples
+      # Leave everything else unchanged
+      node ->
+        node
+    end)
+  end
 
-      defmodule UserSchema do
-        use Elixact, define_struct: true
-
-        schema do
-          field :password, :string, required: true
-          field :password_confirmation, :string, required: true
-
-          model_validator :validate_passwords_match
-        end
-
-        def validate_passwords_match(input) do
-          if input.password == input.password_confirmation do
-            {:ok, input}
-          else
-            {:error, "passwords do not match"}
-          end
-        end
-      end
-
-  ## Multiple Validators
-  Multiple model validators can be defined and will execute in the order they are declared:
-
-      schema do
-        field :username, :string, required: true
-        field :email, :string, required: true
-
-        model_validator :validate_username_unique
-        model_validator :validate_email_format
-        model_validator :send_welcome_email
-      end
-
-  ## Data Transformation
-  Model validators can transform the data by returning modified data:
-
-      def normalize_email(input) do
-        normalized = %{input | email: String.downcase(input.email)}
-        {:ok, normalized}
-      end
-  """
-  @spec model_validator(atom()) :: Macro.t()
-  defmacro model_validator(function_name) when is_atom(function_name) do
+  # Handle type definitions
+  @spec handle_type(term()) :: Macro.t()
+  defp handle_type({:array, type}) do
     quote do
-      @model_validators {__MODULE__, unquote(function_name)}
+      Types.array(unquote(handle_type(type)))
+    end
+  end
+
+  # Handle map types
+  defp handle_type({:map, {key_type, value_type}}) do
+    normalized_key = handle_type(key_type)
+    normalized_value = handle_type(value_type)
+
+    quote do
+      Types.map(unquote(normalized_key), unquote(normalized_value))
+    end
+  end
+
+  defp handle_type({:union, types}) do
+    quote do
+      Types.union(unquote(types |> Enum.map(&handle_type/1)))
+    end
+  end
+
+  defp handle_type({:__aliases__, _, _} = module_alias) do
+    quote do
+      unquote(module_alias)
+    end
+  end
+
+  # Handle built-in types and references
+  defp handle_type(type) when is_atom(type) do
+    if type in [:string, :integer, :float, :boolean, :any, :atom, :map] do
+      quote do
+        Types.type(unquote(type))
+      end
+    else
+      # Assume it's a reference
+      {:ref, type}
     end
   end
 end
