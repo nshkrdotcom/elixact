@@ -161,6 +161,7 @@ defmodule Elixact.JsonSchema.ReferenceStoreEdgeCasesTest do
       ReferenceStore.stop(store)
     end
 
+    @tag :performance
     test "handles large numbers of references and definitions" do
       {:ok, store} = ReferenceStore.start_link()
 
