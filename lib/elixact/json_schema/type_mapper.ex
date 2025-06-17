@@ -148,7 +148,10 @@ defmodule Elixact.JsonSchema.TypeMapper do
   end
 
   # Convert type definitions to JSON Schema
-  @spec convert_type(Elixact.Types.type_definition(), pid() | nil) :: map()
+  @spec convert_type(
+          Elixact.Types.type_definition() | {:tuple, [Elixact.Types.type_definition()]},
+          pid() | nil
+        ) :: map()
   defp convert_type({:type, base_type, constraints}, _store)
        when base_type in [:string, :integer, :float, :boolean, :atom, :any, :map] do
     map_basic_type(base_type)

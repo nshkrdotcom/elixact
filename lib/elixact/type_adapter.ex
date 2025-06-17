@@ -61,47 +61,55 @@ defmodule Elixact.TypeAdapter do
     path = Keyword.get(opts, :path, [])
     coerce = Keyword.get(opts, :coerce, false)
 
-    normalized_type = normalize_type_spec(type_spec)
-
-    # Apply coercion if enabled
-    value_to_validate =
-      if coerce do
-        case attempt_coercion(normalized_type, value) do
-          {:ok, coerced} -> coerced
-          # Fall back to original value
-          {:error, _} -> value
-        end
-      else
-        value
-      end
-
     try do
-      # For schema references, use the schema's validation pipeline to include computed fields
-      case normalized_type do
-        {:ref, schema_module} when is_atom(schema_module) ->
-          # Use the schema's own validation which includes model validators and computed fields
-          case schema_module.validate(value_to_validate) do
-            {:ok, validated} -> {:ok, validated}
-            {:error, error} when is_struct(error, Elixact.Error) -> {:error, [error]}
-            {:error, errors} when is_list(errors) -> {:error, errors}
-            {:error, error} -> {:error, [error]}
-          end
-
-        _ ->
-          # For non-schema types, use the basic validator
-          case Validator.validate(normalized_type, value_to_validate, path) do
-            {:ok, validated} -> {:ok, validated}
-            {:error, error} when is_struct(error, Elixact.Error) -> {:error, [error]}
-            {:error, errors} when is_list(errors) -> {:error, errors}
-            {:error, error} -> {:error, [error]}
-          end
-      end
+      normalized_type = normalize_type_spec(type_spec)
+      value_to_validate = maybe_coerce_value(normalized_type, value, coerce)
+      perform_validation(normalized_type, value_to_validate, path)
     rescue
-      FunctionClauseError ->
+      _e in [FunctionClauseError, MatchError] ->
         reraise ArgumentError, "Invalid type specification: #{inspect(type_spec)}", __STACKTRACE__
+    end
+  end
 
-      MatchError ->
-        reraise ArgumentError, "Invalid type specification: #{inspect(type_spec)}", __STACKTRACE__
+  @spec maybe_coerce_value(Types.type_definition(), term(), boolean()) :: term()
+  defp maybe_coerce_value(type, value, true) do
+    case attempt_coercion(type, value) do
+      {:ok, coerced} -> coerced
+      {:error, _} -> value
+    end
+  end
+
+  defp maybe_coerce_value(_type, value, false), do: value
+
+  @spec perform_validation(Types.type_definition(), term(), [atom() | String.t() | integer()]) ::
+          {:ok, term()} | {:error, [Elixact.Error.t()]}
+  defp perform_validation({:ref, schema_module}, value, _path) when is_atom(schema_module) do
+    validate_schema_reference(schema_module, value)
+  end
+
+  defp perform_validation(type, value, path) do
+    validate_basic_type(type, value, path)
+  end
+
+  @spec validate_schema_reference(module(), term()) ::
+          {:ok, term()} | {:error, [Elixact.Error.t()]}
+  defp validate_schema_reference(schema_module, value) do
+    case schema_module.validate(value) do
+      {:ok, validated} -> {:ok, validated}
+      {:error, error} when is_struct(error, Elixact.Error) -> {:error, [error]}
+      {:error, errors} when is_list(errors) -> {:error, errors}
+      {:error, error} -> {:error, [error]}
+    end
+  end
+
+  @spec validate_basic_type(Types.type_definition(), term(), [atom() | String.t() | integer()]) ::
+          {:ok, term()} | {:error, [Elixact.Error.t()]}
+  defp validate_basic_type(type, value, path) do
+    case Validator.validate(type, value, path) do
+      {:ok, validated} -> {:ok, validated}
+      {:error, error} when is_struct(error, Elixact.Error) -> {:error, [error]}
+      {:error, errors} when is_list(errors) -> {:error, errors}
+      {:error, error} -> {:error, [error]}
     end
   end
 

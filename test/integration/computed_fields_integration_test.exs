@@ -80,7 +80,7 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
             case data.follower_count do
               count when count < 100 -> "beginner"
               count when count < 1000 -> "growing"
-              count when count < 10000 -> "influencer"
+              count when count < 10_000 -> "influencer"
               _ -> "celebrity"
             end
 

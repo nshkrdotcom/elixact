@@ -179,47 +179,78 @@ defmodule Elixact.StructValidator do
         ]) ::
           {:ok, map()} | {:error, [Error.t()]}
   defp validate_fields_only(fields, data, path) do
-    results =
-      Enum.map(fields, fn {name, meta} ->
-        field_path = path ++ [name]
+    results = validate_individual_fields(fields, data, path)
 
-        case extract_field_value(data, name) do
-          {:ok, value} ->
-            case Validator.validate(meta.type, value, field_path) do
-              {:ok, validated} -> {name, {:ok, validated}}
-              {:error, error} -> {name, {:error, error}}
-            end
-
-          {:error, :missing} when not meta.required ->
-            case meta.default do
-              nil -> {name, :skip}
-              default -> {name, {:ok, default}}
-            end
-
-          {:error, :missing} ->
-            error = Error.new(field_path, :required, "field is required")
-            {name, {:error, error}}
-        end
-      end)
-
-    errors =
-      results
-      |> Enum.filter(fn {_name, result} -> match?({:error, _}, result) end)
-      |> Enum.map(fn {_name, {:error, error}} -> error end)
-
-    case errors do
+    case collect_validation_errors(results) do
       [] ->
-        validated =
-          results
-          |> Enum.reject(fn {_name, result} -> result == :skip end)
-          |> Enum.map(fn {name, {:ok, value}} -> {name, value} end)
-          |> Map.new()
-
-        {:ok, validated}
+        validated_map = build_validated_map(results)
+        {:ok, validated_map}
 
       errors ->
         {:error, errors}
     end
+  end
+
+  @spec validate_individual_fields([{atom(), Elixact.FieldMeta.t()}], map(), [
+          atom() | String.t() | integer()
+        ]) ::
+          [{atom(), {:ok, term()} | {:error, Error.t()} | :skip}]
+  defp validate_individual_fields(fields, data, path) do
+    Enum.map(fields, fn {name, meta} ->
+      field_path = path ++ [name]
+      validate_single_field(name, meta, data, field_path)
+    end)
+  end
+
+  @spec validate_single_field(atom(), Elixact.FieldMeta.t(), map(), [
+          atom() | String.t() | integer()
+        ]) ::
+          {atom(), {:ok, term()} | {:error, Error.t()} | :skip}
+  defp validate_single_field(name, meta, data, field_path) do
+    case extract_field_value(data, name) do
+      {:ok, value} ->
+        {name, validate_field_value(meta, value, field_path)}
+
+      {:error, :missing} when not meta.required ->
+        handle_optional_field(name, meta)
+
+      {:error, :missing} ->
+        {name, {:error, Error.new(field_path, :required, "field is required")}}
+    end
+  end
+
+  @spec validate_field_value(Elixact.FieldMeta.t(), term(), [atom() | String.t() | integer()]) ::
+          {:ok, term()} | {:error, Error.t()}
+  defp validate_field_value(meta, value, field_path) do
+    case Validator.validate(meta.type, value, field_path) do
+      {:ok, validated} -> {:ok, validated}
+      {:error, error} -> {:error, error}
+    end
+  end
+
+  @spec handle_optional_field(atom(), Elixact.FieldMeta.t()) :: {atom(), {:ok, term()} | :skip}
+  defp handle_optional_field(name, meta) do
+    case meta.default do
+      nil -> {name, :skip}
+      default -> {name, {:ok, default}}
+    end
+  end
+
+  @spec collect_validation_errors([{atom(), {:ok, term()} | {:error, Error.t()} | :skip}]) :: [
+          Error.t()
+        ]
+  defp collect_validation_errors(results) do
+    results
+    |> Enum.filter(fn {_name, result} -> match?({:error, _}, result) end)
+    |> Enum.map(fn {_name, {:error, error}} -> error end)
+  end
+
+  @spec build_validated_map([{atom(), {:ok, term()} | {:error, Error.t()} | :skip}]) :: map()
+  defp build_validated_map(results) do
+    results
+    |> Enum.reject(fn {_name, result} -> result == :skip end)
+    |> Enum.map(fn {name, {:ok, value}} -> {name, value} end)
+    |> Map.new()
   end
 
   @spec extract_field_value(map(), atom()) :: {:ok, term()} | {:error, :missing}
