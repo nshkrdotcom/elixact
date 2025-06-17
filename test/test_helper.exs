@@ -325,6 +325,23 @@ defmodule TestHelpers do
   end
 
   defp generate_random_value(_), do: "unknown_type"
+
+  # Helper functions for enhanced schema tests
+  def trim_name(data) do
+    {:ok, %{data | name: String.trim(data.name)}}
+  end
+
+  def upcase_name(data) do
+    {:ok, String.upcase(data.name)}
+  end
+
+  def validate_name(data) do
+    if String.length(data.name) > 0 do
+      {:ok, data}
+    else
+      {:error, "name cannot be empty"}
+    end
+  end
 end
 
 # Performance test configuration

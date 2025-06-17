@@ -4,9 +4,149 @@ defmodule Elixact.Runtime do
 
   This module enables dynamic schema creation from field definitions at runtime,
   supporting the DSPy pattern of `pydantic.create_model("DSPyProgramOutputs", **fields)`.
+
+  ## Phase 5 Enhancement: Enhanced Runtime Schemas
+
+  Added support for enhanced runtime schemas with model validators and computed fields:
+
+      # Create enhanced schema with full validation pipeline
+      fields = [{:name, :string, [required: true]}, {:age, :integer, [optional: true]}]
+      
+      # Model validators for cross-field validation
+      validators = [
+        fn data -> {:ok, %{data | name: String.trim(data.name)}} end,
+        {MyModule, :validate_age}
+      ]
+      
+      # Computed fields for derived values
+      computed_fields = [
+        {:display_name, :string, fn data -> {:ok, String.upcase(data.name)} end},
+        {:age_group, :string, {MyModule, :compute_age_group}}
+      ]
+      
+      # Create enhanced schema
+      schema = Runtime.create_enhanced_schema(fields,
+        title: "User Schema",
+        model_validators: validators,
+        computed_fields: computed_fields
+      )
+      
+      # Validate with full pipeline
+      {:ok, result} = Runtime.validate_enhanced(%{name: "  john  ", age: 25}, schema)
+      # Result: %{name: "john", age: 25, display_name: "JOHN", age_group: "adult"}
+
+  Enhanced schemas support:
+  - Model validators (both named functions and anonymous functions)
+  - Computed fields (both named functions and anonymous functions)  
+  - Full validation pipeline execution (field → model → computed)
+  - JSON Schema generation with enhanced metadata
+  - Integration with existing validation infrastructure
+
+  ## Basic Runtime Schemas
+
+  For simple use cases without enhanced features:
+
+      # Basic runtime schema
+      fields = [{:name, :string, [required: true]}, {:age, :integer, [optional: true]}]
+      schema = Runtime.create_schema(fields, title: "Basic User Schema")
+      
+      {:ok, validated} = Runtime.validate(%{name: "John", age: 30}, schema)
+      # Result: %{name: "John", age: 30}
+
+  ## Schema Types
+
+  - `DynamicSchema` - Basic runtime schema with field validation
+  - `EnhancedSchema` - Advanced runtime schema with model validators and computed fields
+
+  ## Phase 5 Migration Guide
+
+  ### Upgrading to Enhanced Runtime Schemas
+
+  Phase 5 adds enhanced runtime schemas while maintaining 100% backward compatibility with existing DynamicSchema usage.
+
+  #### Existing Code (Still Works)
+  ```elixir
+  # All existing runtime schema code continues to work unchanged
+  fields = [{:name, :string, [required: true]}]
+  schema = Elixact.Runtime.create_schema(fields)
+  {:ok, result} = Elixact.Runtime.validate(data, schema)
+  ```
+
+  #### New Enhanced Features
+  ```elixir
+  # Create enhanced schema with model validators and computed fields
+  fields = [{:name, :string, [required: true]}]
+
+  validators = [fn data -> {:ok, %{data | name: String.trim(data.name)}} end]
+  computed = [{:display_name, :string, fn data -> {:ok, String.upcase(data.name)} end}]
+
+  enhanced_schema = Elixact.Runtime.create_enhanced_schema(fields,
+    model_validators: validators,
+    computed_fields: computed
+  )
+
+  {:ok, result} = Elixact.Runtime.validate_enhanced(data, enhanced_schema)
+  ```
+
+  #### Unified Validation Interface
+  ```elixir
+  # Use Elixact.Runtime.Validator for unified interface
+  alias Elixact.Runtime.Validator
+
+  # Works with both DynamicSchema and EnhancedSchema
+  {:ok, result} = Validator.validate(data, any_runtime_schema)
+  json_schema = Validator.to_json_schema(any_runtime_schema)
+  info = Validator.schema_info(any_runtime_schema)
+  ```
+
+  ### Breaking Changes
+  None. All existing code continues to work without modification.
+
+  ### New Dependencies
+  None. Phase 5 uses only existing Elixact modules and standard library functions.
+
+  ### Performance Impact
+  - DynamicSchema validation performance unchanged
+  - EnhancedSchema adds minimal overhead for model validator and computed field execution
+  - JSON schema generation includes computed field metadata with negligible performance impact
+
+  ## Implementation Notes
+
+  ### Function Storage
+  Enhanced schemas store anonymous functions in a runtime function registry, ensuring they can be executed during validation while maintaining clean serialization for schema metadata.
+
+  ### Error Handling
+  Enhanced schemas provide comprehensive error handling:
+  - Field validation errors maintain existing behavior
+  - Model validator errors include clear context and function references
+  - Computed field errors specify which computation failed and why
+  - Type validation errors for computed field return values
+
+  ### JSON Schema Integration
+  Enhanced schemas generate JSON schemas that include:
+  - All regular fields with their types and constraints
+  - Computed fields marked as `readOnly: true`
+  - Enhanced metadata (`x-enhanced-schema`, `x-model-validators`, `x-computed-fields`)
+  - Full compatibility with existing JSON schema tooling
+
+  ### Memory Management
+  Runtime functions are stored efficiently with unique generated names to prevent conflicts. The function registry is cleaned up when the schema is garbage collected.
+
+  ## Testing Strategy
+
+  Phase 5 includes comprehensive tests covering:
+  - Basic enhanced schema creation and validation
+  - Model validator execution (named and anonymous functions)
+  - Computed field execution (named and anonymous functions)
+  - Error handling at each pipeline stage
+  - JSON schema generation with enhanced features
+  - Integration with existing validation infrastructure
+  - Performance benchmarks for enhanced vs basic schemas
+
+  All existing tests continue to pass, ensuring backward compatibility.
   """
 
-  alias Elixact.Runtime.DynamicSchema
+  alias Elixact.Runtime.{DynamicSchema, EnhancedSchema}
   alias Elixact.{FieldMeta, Validator}
   alias Elixact.JsonSchema.{ReferenceStore, TypeMapper}
 
@@ -175,6 +315,76 @@ defmodule Elixact.Runtime do
     after
       ReferenceStore.stop(store)
     end
+  end
+
+  @doc """
+  Creates an enhanced runtime schema with model validators and computed fields.
+
+  This function provides a convenient way to create schemas with enhanced features
+  similar to compile-time schemas but generated at runtime.
+
+  ## Parameters
+    * `field_definitions` - List of field definitions
+    * `opts` - Enhanced schema options
+
+  ## Options
+    * `:model_validators` - List of model validator functions
+    * `:computed_fields` - List of computed field specifications
+    * Standard options: `:title`, `:description`, `:strict`, `:name`
+
+  ## Examples
+
+      iex> fields = [{:name, :string, [required: true]}, {:age, :integer, [optional: true]}]
+      iex> validators = [fn data -> {:ok, %{data | name: String.trim(data.name)}} end]
+      iex> computed = [{:display_name, :string, fn data -> {:ok, String.upcase(data.name)} end}]
+      iex> schema = Elixact.Runtime.create_enhanced_schema(fields,
+      ...>   model_validators: validators,
+      ...>   computed_fields: computed
+      ...> )
+      %Elixact.Runtime.EnhancedSchema{...}
+  """
+  @spec create_enhanced_schema([field_definition()], [schema_option()]) :: EnhancedSchema.t()
+  def create_enhanced_schema(field_definitions, opts \\ []) do
+    EnhancedSchema.create(field_definitions, opts)
+  end
+
+  @doc """
+  Validates data against an enhanced runtime schema.
+
+  ## Parameters
+    * `data` - The data to validate (map)
+    * `enhanced_schema` - An EnhancedSchema struct
+    * `opts` - Validation options
+
+  ## Returns
+    * `{:ok, validated_data}` on success (includes computed fields)
+    * `{:error, errors}` on validation failure
+
+  ## Examples
+
+      iex> data = %{name: "  John  ", age: 30}
+      iex> Elixact.Runtime.validate_enhanced(data, schema)
+      {:ok, %{name: "John", age: 30, display_name: "JOHN"}}
+  """
+  @spec validate_enhanced(map(), EnhancedSchema.t(), keyword()) ::
+          {:ok, map()} | {:error, [Elixact.Error.t()]}
+  def validate_enhanced(data, %EnhancedSchema{} = enhanced_schema, opts \\ []) do
+    EnhancedSchema.validate(data, enhanced_schema, opts)
+  end
+
+  @doc """
+  Generates JSON Schema for enhanced runtime schemas.
+
+  ## Parameters
+    * `enhanced_schema` - An EnhancedSchema struct
+    * `opts` - JSON Schema generation options
+
+  ## Returns
+    * JSON Schema map including computed field metadata
+  """
+  @spec enhanced_to_json_schema(EnhancedSchema.t(), keyword()) :: map()
+  def enhanced_to_json_schema(%EnhancedSchema{} = enhanced_schema, opts \\ []) do
+    EnhancedSchema.to_json_schema(enhanced_schema, opts)
   end
 
   # Private helper functions
