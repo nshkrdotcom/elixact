@@ -6,7 +6,9 @@ defmodule Elixact.Phase6PerformanceTest do
   while providing enhanced functionality.
   """
 
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+
+  alias Elixact.JsonSchema.EnhancedResolver
 
   defmodule TestSchema do
     use Elixact, define_struct: true
@@ -84,13 +86,13 @@ defmodule Elixact.Phase6PerformanceTest do
     {time, _results} =
       :timer.tc(fn ->
         for _ <- 1..100 do
-          Elixact.JsonSchema.EnhancedResolver.resolve_enhanced(TestSchema)
+          EnhancedResolver.resolve_enhanced(TestSchema)
         end
       end)
 
     avg_time = time / 100
     # Should be less than 10ms average
-    assert avg_time < 10000, "Enhanced JSON schema generation too slow: #{avg_time}μs average"
+    assert avg_time < 10_000, "Enhanced JSON schema generation too slow: #{avg_time}μs average"
   end
 
   @tag :performance

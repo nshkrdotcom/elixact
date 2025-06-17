@@ -5,8 +5,8 @@ defmodule Elixact.JsonSchema.EnhancedResolverTest do
   use ExUnit.Case, async: true
   doctest Elixact.JsonSchema.EnhancedResolver
 
-  alias Elixact.JsonSchema.EnhancedResolver
-  alias Elixact.Runtime
+  alias Elixact.{EnhancedValidator, JsonSchema, Runtime}
+  alias Elixact.JsonSchema.{EnhancedResolver, Resolver}
 
   # Test schemas for comprehensive testing
   defmodule FullFeaturedSchema do
@@ -402,7 +402,7 @@ defmodule Elixact.JsonSchema.EnhancedResolverTest do
   describe "integration with existing functionality" do
     test "works with existing JSON schema generation" do
       # Test that enhanced resolver doesn't break existing functionality
-      basic_schema = Elixact.JsonSchema.from_schema(SimpleSchema)
+      basic_schema = JsonSchema.from_schema(SimpleSchema)
       enhanced_schema = EnhancedResolver.resolve_enhanced(SimpleSchema)
 
       # Should have same basic structure
@@ -417,7 +417,7 @@ defmodule Elixact.JsonSchema.EnhancedResolverTest do
       data = %{name: "John", email: "JOHN@EXAMPLE.COM", age: 25}
 
       # Test that schemas enhanced by this resolver still work with EnhancedValidator
-      {:ok, validated} = Elixact.EnhancedValidator.validate(FullFeaturedSchema, data)
+      {:ok, validated} = EnhancedValidator.validate(FullFeaturedSchema, data)
 
       assert %FullFeaturedSchema{} = validated
       # Model validator normalization
@@ -431,9 +431,7 @@ defmodule Elixact.JsonSchema.EnhancedResolverTest do
     test "maintains backward compatibility with existing resolvers" do
       # Test that enhanced resolver can work alongside existing resolver
       standard_resolved =
-        Elixact.JsonSchema.Resolver.resolve_references(
-          Elixact.JsonSchema.from_schema(FullFeaturedSchema)
-        )
+        Resolver.resolve_references(JsonSchema.from_schema(FullFeaturedSchema))
 
       enhanced_resolved = EnhancedResolver.resolve_enhanced(FullFeaturedSchema)
 

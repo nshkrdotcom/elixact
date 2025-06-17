@@ -15,9 +15,9 @@ defmodule Elixact.JsonSchema.EnhancedResolver do
   - Maintains backward compatibility with existing resolvers
   """
 
+  alias Elixact.{EnhancedValidator, Runtime}
   alias Elixact.JsonSchema.Resolver
   alias Elixact.Runtime.{DynamicSchema, EnhancedSchema}
-  alias Elixact.EnhancedValidator
 
   @type enhanced_resolution_options :: [
           include_model_validators: boolean(),
@@ -321,11 +321,11 @@ defmodule Elixact.JsonSchema.EnhancedResolver do
   end
 
   defp generate_base_enhanced_schema(%DynamicSchema{} = schema, _opts) do
-    Elixact.Runtime.to_json_schema(schema)
+    Runtime.to_json_schema(schema)
   end
 
   defp generate_base_enhanced_schema(%EnhancedSchema{} = schema, _opts) do
-    Elixact.Runtime.EnhancedSchema.to_json_schema(schema)
+    Runtime.EnhancedSchema.to_json_schema(schema)
   end
 
   defp generate_base_enhanced_schema(_invalid_schema, _opts) do
@@ -470,11 +470,9 @@ defmodule Elixact.JsonSchema.EnhancedResolver do
   @spec test_validation_pipeline(module() | DynamicSchema.t() | EnhancedSchema.t(), map()) ::
           {:ok, term()} | {:error, term()}
   defp test_validation_pipeline(schema_or_spec, sample_data) do
-    try do
-      EnhancedValidator.validate(schema_or_spec, sample_data)
-    rescue
-      e -> {:error, "Validation pipeline failed: #{Exception.message(e)}"}
-    end
+    EnhancedValidator.validate(schema_or_spec, sample_data)
+  rescue
+    e -> {:error, "Validation pipeline failed: #{Exception.message(e)}"}
   end
 
   @spec test_llm_provider_compatibility(map(), [atom()]) :: map()
@@ -514,7 +512,7 @@ defmodule Elixact.JsonSchema.EnhancedResolver do
     # Computed fields are more expensive
     # Model validators add overhead
     complexity_score =
-      structure.field_count * 1 +
+      structure.field_count +
         structure.computed_field_count * 3 +
         structure.model_validator_count * 2
 
@@ -584,14 +582,14 @@ defmodule Elixact.JsonSchema.EnhancedResolver do
         enhanced_properties =
           Enum.reduce(properties, %{}, fn {field_name, field_schema}, acc ->
             enhanced_field =
-              if not Map.has_key?(field_schema, "description") do
+              if Map.has_key?(field_schema, "description") do
+                field_schema
+              else
                 Map.put(
                   field_schema,
                   "description",
                   generate_auto_description(field_name, field_schema)
                 )
-              else
-                field_schema
               end
 
             Map.put(acc, field_name, enhanced_field)
@@ -817,7 +815,7 @@ defmodule Elixact.JsonSchema.EnhancedResolver do
     cond do
       total < 1000 -> "< 1KB"
       total < 5000 -> "1-5KB"
-      total < 10000 -> "5-10KB"
+      total < 10_000 -> "5-10KB"
       true -> "> 10KB"
     end
   end
@@ -895,10 +893,10 @@ defmodule Elixact.JsonSchema.EnhancedResolver do
         documented_properties =
           Enum.reduce(properties, %{}, fn {key, prop}, acc ->
             documented_prop =
-              if not Map.has_key?(prop, "description") do
-                Map.put(prop, "description", generate_auto_description(key, prop))
-              else
+              if Map.has_key?(prop, "description") do
                 prop
+              else
+                Map.put(prop, "description", generate_auto_description(key, prop))
               end
 
             Map.put(acc, key, documented_prop)

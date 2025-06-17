@@ -49,6 +49,7 @@ defmodule Elixact.Runtime.PerformanceBenchmarkTest do
       IO.puts("Performance ratio: #{Float.round(performance_ratio, 2)}x")
     end
 
+    @tag :performance
     test "model validator performance impact" do
       fields = [{:name, :string, [required: true]}, {:value, :integer, [required: true]}]
 

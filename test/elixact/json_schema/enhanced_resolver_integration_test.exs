@@ -1,8 +1,9 @@
 defmodule Elixact.JsonSchema.EnhancedResolverIntegrationTest do
   use ExUnit.Case, async: true
 
+  alias Elixact.EnhancedValidator
   alias Elixact.JsonSchema.EnhancedResolver
-  alias Elixact.{Runtime, EnhancedValidator}
+  alias Elixact.Runtime
 
   # Define test schemas at module level to avoid cyclic references
   defmodule WorkflowTestSchema do
@@ -400,7 +401,7 @@ defmodule Elixact.JsonSchema.EnhancedResolverIntegrationTest do
       assert simple_analysis.performance_metrics.complexity_score <
                complex_analysis.performance_metrics.complexity_score
 
-      # Test memory footprint estimation  
+      # Test memory footprint estimation
       assert String.contains?(simple_analysis.performance_metrics.memory_overhead, "KB")
       assert String.contains?(complex_analysis.performance_metrics.memory_overhead, "KB")
     end

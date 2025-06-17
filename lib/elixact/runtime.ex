@@ -148,7 +148,7 @@ defmodule Elixact.Runtime do
 
   alias Elixact.Runtime.{DynamicSchema, EnhancedSchema}
   alias Elixact.{FieldMeta, Validator}
-  alias Elixact.JsonSchema.{ReferenceStore, TypeMapper}
+  alias Elixact.JsonSchema.{ReferenceStore, Resolver, TypeMapper}
 
   @type field_definition :: {atom(), type_spec()} | {atom(), type_spec(), keyword()}
   @type type_spec :: Elixact.Types.type_definition() | atom() | module()
@@ -528,7 +528,7 @@ defmodule Elixact.Runtime do
     dspy_metadata = %{
       dspy_compatibility_checked: true,
       dspy_issues: issues,
-      dspy_compatible: length(issues) == 0
+      dspy_compatible: issues == []
     }
 
     updated_metadata = Map.merge(schema.metadata, dspy_metadata)
@@ -602,7 +602,7 @@ defmodule Elixact.Runtime do
     Enum.reduce(providers, %{}, fn provider, acc ->
       try do
         optimized =
-          Elixact.JsonSchema.Resolver.enforce_structured_output(
+          Resolver.enforce_structured_output(
             json_schema,
             provider: provider
           )
@@ -625,35 +625,44 @@ defmodule Elixact.Runtime do
     end)
   end
 
-  @spec calculate_compatibility_score(map(), atom()) :: integer()
+  @spec calculate_compatibility_score(map(), atom()) :: pos_integer()
   defp calculate_compatibility_score(schema, provider) do
     base_score = 50
-
-    # Provider-specific scoring
-    score =
-      case provider do
-        :openai ->
-          score = base_score
-          score = if Map.get(schema, "additionalProperties") == false, do: score + 20, else: score
-          score = if Map.has_key?(schema, "required"), do: score + 15, else: score
-          score = if Map.get(schema, "type") == "object", do: score + 10, else: score
-          score
-
-        :anthropic ->
-          score = base_score
-          score = if Map.has_key?(schema, "required"), do: score + 20, else: score
-          score = if Map.get(schema, "additionalProperties") == false, do: score + 15, else: score
-          score = if Map.get(schema, "type") == "object", do: score + 10, else: score
-          score
-
-        :generic ->
-          base_score + 25
-
-        _ ->
-          base_score
-      end
-
+    score = calculate_provider_specific_score(schema, provider, base_score)
     min(score, 100)
+  end
+
+  @spec calculate_provider_specific_score(map(), atom(), pos_integer()) :: pos_integer()
+  defp calculate_provider_specific_score(schema, :openai, base_score) do
+    base_score
+    |> add_score_for_additional_properties(schema)
+    |> add_score_for_required_fields(schema)
+    |> add_score_for_object_type(schema)
+  end
+
+  defp calculate_provider_specific_score(schema, :anthropic, base_score) do
+    base_score
+    |> add_score_for_required_fields(schema)
+    |> add_score_for_additional_properties(schema)
+    |> add_score_for_object_type(schema)
+  end
+
+  defp calculate_provider_specific_score(_schema, :generic, base_score), do: base_score + 25
+  defp calculate_provider_specific_score(_schema, _provider, base_score), do: base_score
+
+  @spec add_score_for_additional_properties(pos_integer(), map()) :: pos_integer()
+  defp add_score_for_additional_properties(score, schema) do
+    if Map.get(schema, "additionalProperties") == false, do: score + 20, else: score
+  end
+
+  @spec add_score_for_required_fields(pos_integer(), map()) :: pos_integer()
+  defp add_score_for_required_fields(score, schema) do
+    if Map.has_key?(schema, "required"), do: score + 15, else: score
+  end
+
+  @spec add_score_for_object_type(pos_integer(), map()) :: pos_integer()
+  defp add_score_for_object_type(score, schema) do
+    if Map.get(schema, "type") == "object", do: score + 10, else: score
   end
 
   @spec validate_json_schema_structure(map()) :: %{
@@ -667,10 +676,10 @@ defmodule Elixact.Runtime do
     # Check required fields for object schemas
     issues =
       if Map.get(json_schema, "type") == "object" do
-        if not Map.has_key?(json_schema, "properties") do
-          ["Object schema missing properties" | issues]
-        else
+        if Map.has_key?(json_schema, "properties") do
           issues
+        else
+          ["Object schema missing properties" | issues]
         end
       else
         issues
@@ -691,7 +700,7 @@ defmodule Elixact.Runtime do
     issues = check_constraint_validity(json_schema, issues)
 
     %{
-      valid: length(issues) == 0,
+      valid: issues == [],
       issues: issues,
       checked_at: DateTime.utc_now()
     }
@@ -699,53 +708,37 @@ defmodule Elixact.Runtime do
 
   @spec check_constraint_validity(map(), [String.t()]) :: [String.t()]
   defp check_constraint_validity(schema, issues) do
-    # Check minLength/maxLength for strings
-    issues =
-      if Map.get(schema, "type") == "string" do
+    check_string_constraints(issues, schema)
+  end
+
+  @spec check_string_constraints([String.t()], map()) :: [String.t()]
+  defp check_string_constraints(issues, schema) do
+    case Map.get(schema, "type") do
+      "string" ->
         min_len = Map.get(schema, "minLength")
         max_len = Map.get(schema, "maxLength")
+        validate_string_length_constraints(min_len, max_len, issues)
 
-        cond do
-          min_len && not is_integer(min_len) ->
-            ["minLength must be an integer" | issues]
-
-          max_len && not is_integer(max_len) ->
-            ["maxLength must be an integer" | issues]
-
-          min_len && max_len && min_len > max_len ->
-            ["minLength cannot be greater than maxLength" | issues]
-
-          true ->
-            issues
-        end
-      else
+      _ ->
         issues
-      end
+    end
+  end
 
-    # Check minimum/maximum for numbers
-    issues =
-      if Map.get(schema, "type") in ["number", "integer"] do
-        min_val = Map.get(schema, "minimum")
-        max_val = Map.get(schema, "maximum")
+  @spec validate_string_length_constraints(term(), term(), [String.t()]) :: [String.t()]
+  defp validate_string_length_constraints(min_len, max_len, issues) do
+    cond do
+      min_len && not is_integer(min_len) ->
+        ["minLength must be an integer" | issues]
 
-        cond do
-          min_val && not is_number(min_val) ->
-            ["minimum must be a number" | issues]
+      max_len && not is_integer(max_len) ->
+        ["maxLength must be an integer" | issues]
 
-          max_val && not is_number(max_val) ->
-            ["maximum must be a number" | issues]
+      min_len && max_len && min_len > max_len ->
+        ["minLength cannot be greater than maxLength" | issues]
 
-          min_val && max_val && min_val > max_val ->
-            ["minimum cannot be greater than maximum" | issues]
-
-          true ->
-            issues
-        end
-      else
+      true ->
         issues
-      end
-
-    issues
+    end
   end
 
   # Private helper functions
