@@ -591,6 +591,14 @@ defmodule Elixact.Wrapper do
       :any ->
         true
 
+      # Reference type - schemas accept map data, treat data as map value
+      {:ref, _} ->
+        true
+
+      # Reference type - schemas accept map data, treat data as map value
+      {:type, :ref, _} ->
+        true
+
       _ ->
         # For non-map types, don't treat map as value - let validation handle defaults/missing
         false

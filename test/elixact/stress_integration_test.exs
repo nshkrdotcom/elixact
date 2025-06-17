@@ -312,7 +312,8 @@ defmodule Elixact.StressIntegrationTest do
       assert {:error, errors} = DeepPathSchema.validate(deep_invalid_data)
 
       # Error path should be very deep
-      error = if is_list(errors), do: List.first(errors), else: errors
+      assert is_list(errors), "Expected error list, got: #{inspect(errors)}"
+      error = List.flatten(errors) |> List.first()
       # Should have deep path
       assert length(error.path) >= 5
 
@@ -467,7 +468,8 @@ defmodule Elixact.StressIntegrationTest do
       assert {:error, errors} = MultiErrorSchema.validate(multi_error_data)
 
       # Should collect errors from multiple fields and levels
-      error_list = if is_list(errors), do: errors, else: [errors]
+      assert is_list(errors), "Expected error list, got: #{inspect(errors)}"
+      error_list = List.flatten(errors)
       # At least 3 validation errors
       assert length(error_list) >= 3
 

@@ -207,7 +207,7 @@ defmodule Elixact.ModelValidatorTestSchemas do
     end
 
     def add_full_name(data) do
-      enhanced_data = Map.put(data, :full_name, "#{data.first_name} #{data.last_name}")
+      enhanced_data = Map.put(data, :full_name, data.first_name <> " " <> data.last_name)
       {:ok, enhanced_data}
     end
   end
@@ -237,7 +237,9 @@ defmodule Elixact.ModelValidatorTestSchemas do
           end
 
         "credit" ->
-          if data.credit_limit && data.credit_limit > 0 do
+          credit_limit = Map.get(data, :credit_limit)
+
+          if credit_limit && credit_limit > 0 do
             {:ok, data}
           else
             {:error, "credit accounts must have a positive credit limit"}
@@ -272,9 +274,11 @@ defmodule Elixact.ModelValidatorTestSchemas do
     end
 
     def validate_display_logic(data) do
-      case data.display_preference do
+      case Map.get(data, :display_preference, "name") do
         "nickname" ->
-          if data.nickname && String.length(data.nickname) > 0 do
+          nickname = Map.get(data, :nickname)
+
+          if nickname && String.length(nickname) > 0 do
             {:ok, data}
           else
             {:error, "nickname required when display_preference is 'nickname'"}

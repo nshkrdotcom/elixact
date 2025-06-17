@@ -241,6 +241,11 @@ defmodule Elixact.Runtime do
     {:union, normalized_types, constraints}
   end
 
+  defp normalize_type_definition({:ref, schema_module}, _opts) when is_atom(schema_module) do
+    # Ref types don't need constraints wrapping - they are handled by the referenced schema
+    {:ref, schema_module}
+  end
+
   defp normalize_type_definition(type, opts) do
     constraints = extract_constraints(opts)
     {Elixact.Types.normalize_type(type), constraints}

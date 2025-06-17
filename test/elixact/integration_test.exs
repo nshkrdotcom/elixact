@@ -145,7 +145,9 @@ defmodule Elixact.IntegrationTest do
         is_active: true
       }
 
-      assert {:error, error} = UserSchema.validate(invalid_data)
+      assert {:error, errors} = UserSchema.validate(invalid_data)
+      assert length(errors) == 1
+      error = hd(errors)
       assert error.message =~ "format"
     end
 
@@ -157,7 +159,9 @@ defmodule Elixact.IntegrationTest do
         is_active: true
       }
 
-      assert {:error, error} = UserSchema.validate(invalid_data)
+      assert {:error, errors} = UserSchema.validate(invalid_data)
+      assert length(errors) == 1
+      error = hd(errors)
       assert error.message =~ "format"
     end
 
@@ -176,7 +180,11 @@ defmodule Elixact.IntegrationTest do
         }
       }
 
-      assert {:error, error} = UserSchema.validate(invalid_data)
+      assert {:error, errors} = UserSchema.validate(invalid_data)
+
+      # Should have only one error for the postal code
+      assert length(errors) == 1
+      error = hd(errors)
 
       assert error == %Elixact.Error{
                path: [:address, :postal_code],
@@ -193,7 +201,9 @@ defmodule Elixact.IntegrationTest do
         unknown_field: "value"
       }
 
-      assert {:error, error} = UserSchema.validate(invalid_data)
+      assert {:error, errors} = UserSchema.validate(invalid_data)
+      assert length(errors) == 1
+      error = hd(errors)
       assert error.message =~ "unknown_field"
     end
   end

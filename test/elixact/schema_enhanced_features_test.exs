@@ -66,13 +66,19 @@ defmodule Elixact.SchemaEnhancedFeaturesTest do
 
       # Test atom choices validation
       invalid_role = %{valid_data | role: :invalid_role}
-      assert {:error, error} = UserProfileSchema.validate(invalid_role)
+      assert {:error, errors} = UserProfileSchema.validate(invalid_role)
+      assert length(errors) == 1
+      error = hd(errors)
       assert error.path == [:role]
       assert error.code == :choices
 
       # Test array of atoms
       invalid_tags = %{valid_data | tags: [:valid, "invalid_string", :another]}
-      assert {:error, [error]} = UserProfileSchema.validate(invalid_tags)
+      assert {:error, errors} = UserProfileSchema.validate(invalid_tags)
+      assert length(errors) == 1
+
+      # Extract first error, handling potential nesting
+      error = List.flatten(errors) |> hd()
       assert error.path == [:tags, 1]
       assert error.code == :type
     end
@@ -173,7 +179,9 @@ defmodule Elixact.SchemaEnhancedFeaturesTest do
         | dimensions: %{width: "invalid", height: 5.4, depth: 0.3}
       }
 
-      assert {:error, error} = ProductSchema.validate(invalid_dimensions)
+      assert {:error, errors} = ProductSchema.validate(invalid_dimensions)
+      assert length(errors) == 1
+      error = hd(errors)
       assert error.path == [:dimensions, :width]
       assert error.code == :type
 
@@ -256,7 +264,9 @@ defmodule Elixact.SchemaEnhancedFeaturesTest do
 
       # Test nested validation in object
       invalid_port = %{config_data | database: %{host: "db.example.com", port: 70_000, ssl: true}}
-      assert {:error, error} = ConfigSchema.validate(invalid_port)
+      assert {:error, errors} = ConfigSchema.validate(invalid_port)
+      assert length(errors) == 1
+      error = hd(errors)
       assert error.path == [:database, :port]
       assert error.code == :lt
 
@@ -266,7 +276,9 @@ defmodule Elixact.SchemaEnhancedFeaturesTest do
         | features: %{valid_flag: true, invalid_flag: "not_boolean"}
       }
 
-      assert {:error, [error]} = ConfigSchema.validate(invalid_features)
+      assert {:error, errors} = ConfigSchema.validate(invalid_features)
+      assert length(errors) == 1
+      error = List.flatten(errors) |> hd()
       assert error.path == [:features, :invalid_flag]
       assert error.code == :type
     end

@@ -377,16 +377,18 @@ defmodule Elixact.SchemaEdgeCasesTest do
 
     test "handles strict validation with various extra field scenarios" do
       # Single extra field
-      assert {:error, error} =
+      assert {:error, errors} =
                StrictValidationSchema.validate(%{
                  required_field: "test",
                  extra: "field"
                })
 
+      assert length(errors) == 1
+      error = hd(errors)
       assert error.code == :additional_properties
 
       # Multiple extra fields
-      assert {:error, error} =
+      assert {:error, errors} =
                StrictValidationSchema.validate(%{
                  required_field: "test",
                  extra1: "field1",
@@ -394,10 +396,12 @@ defmodule Elixact.SchemaEdgeCasesTest do
                  extra3: "field3"
                })
 
+      assert length(errors) == 1
+      error = hd(errors)
       assert String.contains?(error.message, "extra1")
 
       # Extra fields with special names
-      assert {:error, error} =
+      assert {:error, errors} =
                StrictValidationSchema.validate(%{
                  "field-with-dashes" => "value",
                  "field.with.dots" => "value",
@@ -405,6 +409,8 @@ defmodule Elixact.SchemaEdgeCasesTest do
                  required_field: "test"
                })
 
+      assert length(errors) == 1
+      error = hd(errors)
       assert error.code == :additional_properties
     end
 

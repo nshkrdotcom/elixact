@@ -76,11 +76,25 @@ defmodule Elixact.TypeAdapter do
       end
 
     try do
-      case Validator.validate(normalized_type, value_to_validate, path) do
-        {:ok, validated} -> {:ok, validated}
-        {:error, error} when is_struct(error, Elixact.Error) -> {:error, [error]}
-        {:error, errors} when is_list(errors) -> {:error, errors}
-        {:error, error} -> {:error, [error]}
+      # For schema references, use the schema's validation pipeline to include computed fields
+      case normalized_type do
+        {:ref, schema_module} when is_atom(schema_module) ->
+          # Use the schema's own validation which includes model validators and computed fields
+          case schema_module.validate(value_to_validate) do
+            {:ok, validated} -> {:ok, validated}
+            {:error, error} when is_struct(error, Elixact.Error) -> {:error, [error]}
+            {:error, errors} when is_list(errors) -> {:error, errors}
+            {:error, error} -> {:error, [error]}
+          end
+
+        _ ->
+          # For non-schema types, use the basic validator
+          case Validator.validate(normalized_type, value_to_validate, path) do
+            {:ok, validated} -> {:ok, validated}
+            {:error, error} when is_struct(error, Elixact.Error) -> {:error, [error]}
+            {:error, errors} when is_list(errors) -> {:error, errors}
+            {:error, error} -> {:error, [error]}
+          end
       end
     rescue
       FunctionClauseError ->

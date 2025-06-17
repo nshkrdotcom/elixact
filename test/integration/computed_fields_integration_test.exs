@@ -8,12 +8,12 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
         use Elixact, define_struct: true
 
         schema do
-          field :name, :string, required: true
-          field :price, :float, required: true
-          field :quantity, :integer, required: true
+          field(:name, :string, required: true)
+          field(:price, :float, required: true)
+          field(:quantity, :integer, required: true)
 
-          computed_field :total_value, :float, :calculate_total_value
-          computed_field :display_price, :string, :format_price
+          computed_field(:total_value, :float, :calculate_total_value)
+          computed_field(:display_price, :string, :format_price)
         end
 
         def calculate_total_value(data) do
@@ -30,7 +30,7 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
       data = %{name: "Widget", price: 9.99, quantity: 5}
 
       assert {:ok, validated} = Elixact.TypeAdapter.validate(type_spec, data)
-      
+
       # Should include computed fields
       assert validated.total_value == 49.95
       assert validated.display_price == "$9.99"
@@ -51,7 +51,7 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
       assert {:ok, validated} = Elixact.Runtime.validate(data, runtime_schema)
       assert validated.name == "John"
       assert validated.email == "john@example.com"
-      
+
       # No computed fields should be present
       refute Map.has_key?(validated, :computed_field)
     end
@@ -62,12 +62,12 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
         use Elixact, define_struct: true
 
         schema do
-          field :username, :string, required: true
-          field :bio, :string, required: false
-          field :follower_count, :integer, required: false, default: 0
+          field(:username, :string, required: true)
+          field(:bio, :string, required: false)
+          field(:follower_count, :integer, required: false, default: 0)
 
-          computed_field :profile_summary, :string, :create_profile_summary
-          computed_field :influence_level, :string, :calculate_influence
+          computed_field(:profile_summary, :string, :create_profile_summary)
+          computed_field(:influence_level, :string, :calculate_influence)
         end
 
         def create_profile_summary(data) do
@@ -76,12 +76,14 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
         end
 
         def calculate_influence(data) do
-          level = case data.follower_count do
-            count when count < 100 -> "beginner"
-            count when count < 1000 -> "growing"
-            count when count < 10000 -> "influencer"
-            _ -> "celebrity"
-          end
+          level =
+            case data.follower_count do
+              count when count < 100 -> "beginner"
+              count when count < 1000 -> "growing"
+              count when count < 10000 -> "influencer"
+              _ -> "celebrity"
+            end
+
           {:ok, level}
         end
       end
@@ -89,8 +91,9 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
       config = Elixact.Config.create(strict: true, coercion: :safe)
       data = %{username: "johndoe", bio: "Software developer", follower_count: 1500}
 
-      assert {:ok, validated} = Elixact.EnhancedValidator.validate(UserProfileSchema, data, config: config)
-      
+      assert {:ok, validated} =
+               Elixact.EnhancedValidator.validate(UserProfileSchema, data, config: config)
+
       assert validated.username == "johndoe"
       assert validated.profile_summary == "johndoe: Software developer"
       assert validated.influence_level == "influencer"
@@ -102,9 +105,9 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
         use Elixact, define_struct: true
 
         schema do
-          field :input_text, :string, required: true
+          field(:input_text, :string, required: true)
 
-          computed_field :processed_text, :string, :process_text
+          computed_field(:processed_text, :string, :process_text)
         end
 
         def process_text(data) do
@@ -117,14 +120,20 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
       strict_config = Elixact.Config.create(strict: true, extra: :forbid)
       data = %{input_text: "  hello world  "}
 
-      assert {:ok, result} = Elixact.EnhancedValidator.validate(ConfigurableSchema, data, config: strict_config)
+      assert {:ok, result} =
+               Elixact.EnhancedValidator.validate(ConfigurableSchema, data, config: strict_config)
+
       assert result.processed_text == "HELLO WORLD"
 
       # Test with lenient config
       lenient_config = Elixact.Config.create(strict: false, extra: :allow)
       data_with_extra = %{input_text: "test", extra_field: "ignored"}
 
-      assert {:ok, result} = Elixact.EnhancedValidator.validate(ConfigurableSchema, data_with_extra, config: lenient_config)
+      assert {:ok, result} =
+               Elixact.EnhancedValidator.validate(ConfigurableSchema, data_with_extra,
+                 config: lenient_config
+               )
+
       assert result.processed_text == "TEST"
     end
 
@@ -134,9 +143,9 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
         use Elixact, define_struct: true
 
         schema do
-          field :raw_data, :string, required: true
+          field(:raw_data, :string, required: true)
 
-          computed_field :processed_data, :string, :transform_data
+          computed_field(:processed_data, :string, :transform_data)
         end
 
         def transform_data(data) do
@@ -145,11 +154,13 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
       end
 
       # Create wrapper for the entire schema
-      wrapper = Elixact.Wrapper.create_wrapper(:result, {:ref, WrappedComputedSchema}, coerce: false)
+      wrapper =
+        Elixact.Wrapper.create_wrapper(:result, {:ref, WrappedComputedSchema}, coerce: false)
+
       input_data = %{raw_data: "test input"}
 
       assert {:ok, validated} = Elixact.Wrapper.validate_and_extract(wrapper, input_data, :result)
-      
+
       assert validated.raw_data == "test input"
       assert validated.processed_data == "PROCESSED: test input"
     end
@@ -160,11 +171,11 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
         use Elixact, define_struct: true
 
         schema do
-          field :numbers, {:array, :integer}, required: true
-          field :metadata, {:map, {:string, :any}}, required: false, default: %{}
+          field(:numbers, {:array, :integer}, required: true)
+          field(:metadata, {:map, {:string, :any}}, required: false, default: %{})
 
-          computed_field :statistics, {:map, {:string, :float}}, :calculate_statistics
-          computed_field :summary_list, {:array, :string}, :create_summary_list
+          computed_field(:statistics, {:map, {:string, :float}}, :calculate_statistics)
+          computed_field(:summary_list, {:array, :string}, :create_summary_list)
         end
 
         def calculate_statistics(data) do
@@ -172,12 +183,13 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
           count = length(numbers)
           sum = Enum.sum(numbers)
           avg = if count > 0, do: sum / count, else: 0.0
-          
+
           stats = %{
             "count" => count * 1.0,
             "sum" => sum * 1.0,
             "average" => avg
           }
+
           {:ok, stats}
         end
 
@@ -187,6 +199,7 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
             "Sum: #{Enum.sum(data.numbers)}",
             "Metadata keys: #{Map.keys(data.metadata) |> Enum.join(", ")}"
           ]
+
           {:ok, summary}
         end
       end
@@ -197,12 +210,12 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
       }
 
       assert {:ok, validated} = ComplexTypeSchema.validate(data)
-      
+
       # Verify complex computed field types
       assert is_map(validated.statistics)
       assert validated.statistics["count"] == 5.0
       assert validated.statistics["average"] == 3.0
-      
+
       assert is_list(validated.summary_list)
       assert length(validated.summary_list) == 3
       assert hd(validated.summary_list) == "5 numbers provided"
@@ -214,24 +227,26 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
         use Elixact, define_struct: true
 
         schema do
-          field :value, {:union, [:string, :integer]}, required: true
+          field(:value, {:union, [:string, :integer]}, required: true)
 
-          computed_field :value_type, :string, :determine_value_type
-          computed_field :formatted_value, {:union, [:string, :integer]}, :format_value
+          computed_field(:value_type, :string, :determine_value_type)
+          computed_field(:formatted_value, {:union, [:string, :integer]}, :format_value)
         end
 
         def determine_value_type(data) do
-          type = case data.value do
-            val when is_string(val) -> "string"
-            val when is_integer(val) -> "integer"
-            _ -> "unknown"
-          end
+          type =
+            case data.value do
+              val when is_binary(val) -> "string"
+              val when is_integer(val) -> "integer"
+              _ -> "unknown"
+            end
+
           {:ok, type}
         end
 
         def format_value(data) do
           case data.value do
-            val when is_string(val) -> {:ok, String.upcase(val)}
+            val when is_binary(val) -> {:ok, String.upcase(val)}
             val when is_integer(val) -> {:ok, val * 2}
             _ -> {:error, "unsupported value type"}
           end
@@ -256,11 +271,11 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
         use Elixact, define_struct: true
 
         schema do
-          field :items, {:array, :integer}, required: true
+          field(:items, {:array, :integer}, required: true)
 
-          computed_field :item_count, :integer, :count_items
-          computed_field :item_sum, :integer, :sum_items
-          computed_field :item_stats, {:map, {:string, :float}}, :calculate_comprehensive_stats
+          computed_field(:item_count, :integer, :count_items)
+          computed_field(:item_sum, :integer, :sum_items)
+          computed_field(:item_stats, {:map, {:string, :float}}, :calculate_comprehensive_stats)
         end
 
         def count_items(data) do
@@ -274,27 +289,30 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
         def calculate_comprehensive_stats(data) do
           items = data.items
           count = length(items)
-          
+
           if count == 0 do
             {:ok, %{"count" => 0.0, "sum" => 0.0, "mean" => 0.0, "median" => 0.0}}
           else
             sum = Enum.sum(items)
             mean = sum / count
             sorted = Enum.sort(items)
-            median = if rem(count, 2) == 0 do
-              mid1 = Enum.at(sorted, div(count, 2) - 1)
-              mid2 = Enum.at(sorted, div(count, 2))
-              (mid1 + mid2) / 2
-            else
-              Enum.at(sorted, div(count, 2))
-            end
-            
+
+            median =
+              if rem(count, 2) == 0 do
+                mid1 = Enum.at(sorted, div(count, 2) - 1)
+                mid2 = Enum.at(sorted, div(count, 2))
+                (mid1 + mid2) / 2
+              else
+                Enum.at(sorted, div(count, 2))
+              end
+
             stats = %{
               "count" => count * 1.0,
               "sum" => sum * 1.0,
               "mean" => mean,
               "median" => median * 1.0
             }
+
             {:ok, stats}
           end
         end
@@ -302,18 +320,19 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
 
       # Test with moderately large dataset
       large_data = %{items: Enum.to_list(1..1000)}
-      
+
       start_time = System.monotonic_time(:microsecond)
       assert {:ok, result} = LargeDataSchema.validate(large_data)
       end_time = System.monotonic_time(:microsecond)
-      
+
       # Validation should complete in reasonable time (less than 100ms)
       duration_ms = (end_time - start_time) / 1000
       assert duration_ms < 100
-      
+
       # Verify computed results
       assert result.item_count == 1000
-      assert result.item_sum == 500500  # sum of 1..1000
+      # sum of 1..1000
+      assert result.item_sum == 500_500
       assert result.item_stats["count"] == 1000.0
       assert result.item_stats["mean"] == 500.5
     end
@@ -323,11 +342,11 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
         use Elixact, define_struct: true
 
         schema do
-          field :user, {:map, {:string, :any}}, required: true
-          field :preferences, {:map, {:string, :any}}, required: false, default: %{}
+          field(:user, {:map, {:string, :any}}, required: true)
+          field(:preferences, {:map, {:string, :any}}, required: false, default: %{})
 
-          computed_field :user_display, :string, :format_user_display
-          computed_field :theme_preference, :string, :extract_theme
+          computed_field(:user_display, :string, :format_user_display)
+          computed_field(:theme_preference, :string, :extract_theme)
         end
 
         def format_user_display(data) do
@@ -358,11 +377,11 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
         use Elixact, define_struct: true
 
         schema do
-          field :name, :string, required: true
+          field(:name, :string, required: true)
 
-          computed_field :good_field, :string, :working_computation
-          computed_field :error_field, :string, :failing_computation
-          computed_field :another_good_field, :string, :another_working_computation
+          computed_field(:good_field, :string, :working_computation)
+          computed_field(:error_field, :string, :failing_computation)
+          computed_field(:another_good_field, :string, :another_working_computation)
         end
 
         def working_computation(data) do
@@ -380,7 +399,7 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
 
       data = %{name: "test"}
       assert {:error, errors} = ErrorIsolationSchema.validate(data)
-      
+
       # Should have exactly one error for the failing computed field
       assert length(errors) == 1
       error = hd(errors)
@@ -394,13 +413,13 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
         use Elixact, define_struct: true
 
         schema do
-          field :base_price, :float, required: true
-          field :tax_rate, :float, required: true
-          field :discount_percent, :integer, required: false, default: 0
+          field(:base_price, :float, required: true)
+          field(:tax_rate, :float, required: true)
+          field(:discount_percent, :integer, required: false, default: 0)
 
-          computed_field :discount_amount, :float, :calculate_discount
-          computed_field :tax_amount, :float, :calculate_tax
-          computed_field :final_price, :float, :calculate_final_price
+          computed_field(:discount_amount, :float, :calculate_discount)
+          computed_field(:tax_amount, :float, :calculate_tax)
+          computed_field(:final_price, :float, :calculate_final_price)
         end
 
         def calculate_discount(data) do
@@ -427,10 +446,12 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
 
       data = %{base_price: 100.0, tax_rate: 0.08, discount_percent: 10}
       assert {:ok, result} = DependentComputedSchema.validate(data)
-      
+
       assert_in_delta result.discount_amount, 10.0, 0.01
-      assert_in_delta result.tax_amount, 7.2, 0.01  # 8% of $90
-      assert_in_delta result.final_price, 97.2, 0.01  # $90 + $7.20 tax
+      # 8% of $90
+      assert_in_delta result.tax_amount, 7.2, 0.01
+      # $90 + $7.20 tax
+      assert_in_delta result.final_price, 97.2, 0.01
     end
   end
 
@@ -438,14 +459,14 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
     test "existing schemas without computed fields continue to work" do
       # This should pass all existing tests
       # Run a sample of existing validation patterns to ensure compatibility
-      
+
       defmodule LegacySchema do
         use Elixact, define_struct: true
 
         schema do
-          field :name, :string, required: true
-          field :age, :integer, required: false
-          field :email, :string, required: true
+          field(:name, :string, required: true)
+          field(:age, :integer, required: false)
+          field(:email, :string, required: true)
 
           config do
             title("Legacy Schema")
@@ -456,11 +477,11 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
 
       data = %{name: "John", age: 30, email: "john@example.com"}
       assert {:ok, result} = LegacySchema.validate(data)
-      
+
       assert result.name == "John"
       assert result.age == 30
       assert result.email == "john@example.com"
-      
+
       # Should not have any computed fields
       assert LegacySchema.__schema__(:computed_fields) == []
     end
@@ -470,31 +491,32 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
         use Elixact
 
         schema do
-          field :name, :string, required: true
-          field :optional_field, :string, required: false
+          field(:name, :string, required: true)
+          field(:optional_field, :string, required: false)
         end
       end
 
       json_schema = Elixact.JsonSchema.from_schema(LegacySchemaForJSON)
-      
+
       assert json_schema["type"] == "object"
       assert Map.has_key?(json_schema["properties"], "name")
       assert Map.has_key?(json_schema["properties"], "optional_field")
       assert "name" in json_schema["required"]
       refute "optional_field" in json_schema["required"]
-      
+
       # No computed fields should be present
       refute Elixact.JsonSchema.has_computed_fields?(json_schema)
     end
 
     test "all existing validation patterns still work" do
       # Test various existing patterns to ensure no regressions
-      
+
       # Pattern 1: Basic validation
       defmodule BasicSchema do
         use Elixact
+
         schema do
-          field :name, :string, required: true
+          field(:name, :string, required: true)
         end
       end
 
@@ -503,6 +525,7 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
       # Pattern 2: With constraints
       defmodule ConstraintSchema do
         use Elixact
+
         schema do
           field :age, :integer do
             required()
@@ -518,9 +541,10 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
       # Pattern 3: With defaults
       defmodule DefaultSchema do
         use Elixact
+
         schema do
-          field :name, :string, required: true
-          field :active, :boolean, default: true
+          field(:name, :string, required: true)
+          field(:active, :boolean, default: true)
         end
       end
 
@@ -530,9 +554,10 @@ defmodule Elixact.ComputedFieldsIntegrationTest do
       # Pattern 4: Array and map types
       defmodule ComplexSchema do
         use Elixact
+
         schema do
-          field :tags, {:array, :string}, required: true
-          field :metadata, {:map, {:string, :any}}, required: false
+          field(:tags, {:array, :string}, required: true)
+          field(:metadata, {:map, {:string, :any}}, required: false)
         end
       end
 

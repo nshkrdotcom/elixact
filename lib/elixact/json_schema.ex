@@ -116,7 +116,8 @@ defmodule Elixact.JsonSchema do
 
     # Process computed fields
     schema_with_computed_fields =
-      Enum.reduce(computed_fields, schema_with_fields, fn {name, computed_field_meta}, schema_acc ->
+      Enum.reduce(computed_fields, schema_with_fields, fn {name, computed_field_meta},
+                                                          schema_acc ->
         # Add computed field to properties
         properties = Map.get(schema_acc, "properties", %{})
 
@@ -172,7 +173,8 @@ defmodule Elixact.JsonSchema do
   defp convert_computed_field_metadata(computed_field_meta) do
     base = %{
       "description" => computed_field_meta.description,
-      "readOnly" => true  # Computed fields are always read-only
+      # Computed fields are always read-only
+      "readOnly" => true
     }
 
     # Handle example
@@ -227,9 +229,11 @@ defmodule Elixact.JsonSchema do
     end)
     |> Enum.map(fn {name, field_schema} ->
       computed_metadata = field_schema["x-computed-field"]
+
       %{
         name: name,
-        type: field_schema |> Map.drop(["x-computed-field", "readOnly", "description", "examples"]),
+        type:
+          field_schema |> Map.drop(["x-computed-field", "readOnly", "description", "examples"]),
         function: computed_metadata["function"],
         module: computed_metadata["module"],
         function_name: computed_metadata["function_name"],
@@ -281,7 +285,8 @@ defmodule Elixact.JsonSchema do
       # input_schema will not contain computed fields
   """
   @spec remove_computed_fields(json_schema()) :: json_schema()
-  def remove_computed_fields(%{"properties" => properties} = json_schema) when is_map(properties) do
+  def remove_computed_fields(%{"properties" => properties} = json_schema)
+      when is_map(properties) do
     filtered_properties =
       properties
       |> Enum.reject(fn {_name, field_schema} ->
@@ -292,7 +297,9 @@ defmodule Elixact.JsonSchema do
     # Also update required fields to remove any computed fields
     updated_required =
       case Map.get(json_schema, "required") do
-        nil -> nil
+        nil ->
+          nil
+
         required when is_list(required) ->
           computed_field_names =
             properties

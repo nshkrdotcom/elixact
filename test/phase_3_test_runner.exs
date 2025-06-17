@@ -112,7 +112,7 @@ defmodule Elixact.Phase3TestRunner do
       # For this example, we'll simulate the check
       simulate_dialyzer_check()
     rescue
-      e -> 
+      e ->
         IO.puts("❌ Dialyzer check failed: #{Exception.message(e)}")
         {:error, Exception.message(e)}
     end
@@ -120,23 +120,25 @@ defmodule Elixact.Phase3TestRunner do
 
   # Helper functions for running test groups
   defp run_test_group(group_name, tests) do
-    results = Enum.map(tests, fn test ->
-      try do
-        test.()
-        {:ok, test}
-      rescue
-        e -> 
-          IO.puts("❌ Test failed in #{group_name}: #{Exception.message(e)}")
-          {:error, {test, Exception.message(e)}}
-      end
-    end)
+    results =
+      Enum.map(tests, fn test ->
+        try do
+          test.()
+          {:ok, test}
+        rescue
+          e ->
+            IO.puts("❌ Test failed in #{group_name}: #{Exception.message(e)}")
+            {:error, {test, Exception.message(e)}}
+        end
+      end)
 
     {oks, errors} = Enum.split_with(results, &match?({:ok, _}, &1))
-    
+
     IO.puts("✅ #{length(oks)}/#{length(tests)} tests passed in #{group_name}")
-    
+
     if length(errors) > 0 do
       IO.puts("❌ #{length(errors)} tests failed in #{group_name}")
+
       Enum.each(errors, fn {:error, {test, reason}} ->
         IO.puts("   - #{inspect(test)}: #{reason}")
       end)
@@ -149,25 +151,30 @@ defmodule Elixact.Phase3TestRunner do
     IO.puts("\n📊 Phase 3 Test Summary:")
     IO.puts("========================")
 
-    total_passed = results |> Map.values() |> Enum.map(&(Map.get(&1, :passed, 0))) |> Enum.sum()
-    total_failed = results |> Map.values() |> Enum.map(&(Map.get(&1, :failed, 0))) |> Enum.sum()
+    total_passed = results |> Map.values() |> Enum.map(&Map.get(&1, :passed, 0)) |> Enum.sum()
+    total_failed = results |> Map.values() |> Enum.map(&Map.get(&1, :failed, 0)) |> Enum.sum()
     total_tests = total_passed + total_failed
 
     Enum.each(results, fn {category, result} ->
       case result do
         %{passed: passed, failed: 0, total: total} ->
           IO.puts("✅ #{String.capitalize(to_string(category))}: #{passed}/#{total} passed")
+
         %{passed: passed, failed: failed, total: total} ->
-          IO.puts("⚠️  #{String.capitalize(to_string(category))}: #{passed}/#{total} passed (#{failed} failed)")
+          IO.puts(
+            "⚠️  #{String.capitalize(to_string(category))}: #{passed}/#{total} passed (#{failed} failed)"
+          )
+
         {:ok, _} ->
           IO.puts("✅ #{String.capitalize(to_string(category))}: Passed")
+
         {:error, reason} ->
           IO.puts("❌ #{String.capitalize(to_string(category))}: Failed - #{reason}")
       end
     end)
 
     IO.puts("\n🎯 Overall: #{total_passed}/#{total_tests} tests passed")
-    
+
     if total_failed == 0 do
       IO.puts("🎉 All tests passed! Phase 3 is ready for deployment.")
     else
@@ -181,9 +188,9 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :name, :string, required: true
-        field :age, :integer, required: false
-        field :email, :string, required: true
+        field(:name, :string, required: true)
+        field(:age, :integer, required: false)
+        field(:email, :string, required: true)
       end
     end
 
@@ -202,8 +209,8 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :field1, :string, required: true
-        field :field2, :integer, required: false
+        field(:field1, :string, required: true)
+        field(:field2, :integer, required: false)
       end
     end
 
@@ -224,8 +231,8 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :name, :string, required: true
-        model_validator :validate_name_length
+        field(:name, :string, required: true)
+        model_validator(:validate_name_length)
       end
 
       def validate_name_length(data) do
@@ -239,7 +246,7 @@ defmodule Elixact.Phase3TestRunner do
 
     # Should pass validation
     assert {:ok, _} = ModelValidatorTestSchema.validate(%{name: "John"})
-    
+
     # Should fail validation
     assert {:error, _} = ModelValidatorTestSchema.validate(%{name: "J"})
 
@@ -251,13 +258,13 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact
 
       schema do
-        field :name, :string, required: true
-        field :age, :integer, required: false
+        field(:name, :string, required: true)
+        field(:age, :integer, required: false)
       end
     end
 
     json_schema = Elixact.JsonSchema.from_schema(JSONSchemaTestSchema)
-    
+
     assert json_schema["type"] == "object"
     assert Map.has_key?(json_schema["properties"], "name")
     assert Map.has_key?(json_schema["properties"], "age")
@@ -298,12 +305,16 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :name, :string, required: true
+        field(:name, :string, required: true)
       end
     end
 
     config = Elixact.Config.create(strict: true)
-    assert {:ok, _} = Elixact.EnhancedValidator.validate(EnhancedValidatorTestSchema, %{name: "test"}, config: config)
+
+    assert {:ok, _} =
+             Elixact.EnhancedValidator.validate(EnhancedValidatorTestSchema, %{name: "test"},
+               config: config
+             )
 
     :ok
   end
@@ -321,8 +332,8 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :name, :string, required: true
-        computed_field :display_name, :string, :create_display_name
+        field(:name, :string, required: true)
+        computed_field(:display_name, :string, :create_display_name)
       end
 
       def create_display_name(data) do
@@ -345,9 +356,9 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :first_name, :string, required: true
-        field :last_name, :string, required: true
-        computed_field :full_name, :string, :generate_full_name
+        field(:first_name, :string, required: true)
+        field(:last_name, :string, required: true)
+        computed_field(:full_name, :string, :generate_full_name)
       end
 
       def generate_full_name(data) do
@@ -367,8 +378,8 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :name, :string, required: true
-        computed_field :error_field, :string, :failing_function
+        field(:name, :string, required: true)
+        computed_field(:error_field, :string, :failing_function)
       end
 
       def failing_function(_data) do
@@ -391,8 +402,8 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :name, :string, required: true
-        computed_field :wrong_type, :integer, :return_string
+        field(:name, :string, required: true)
+        computed_field(:wrong_type, :integer, :return_string)
       end
 
       def return_string(_data) do
@@ -414,10 +425,12 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :content, :string, required: true
-        computed_field :word_count, :integer, :count_words,
+        field(:content, :string, required: true)
+
+        computed_field(:word_count, :integer, :count_words,
           description: "Number of words",
           example: 42
+        )
       end
 
       def count_words(data) do
@@ -438,8 +451,8 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :name, :string, required: true
-        computed_field :greeting, :string, :create_greeting
+        field(:name, :string, required: true)
+        computed_field(:greeting, :string, :create_greeting)
       end
 
       def create_greeting(data) do
@@ -468,9 +481,9 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :name, :string, required: true
-        model_validator :normalize_name
-        computed_field :display_name, :string, :create_display_name
+        field(:name, :string, required: true)
+        model_validator(:normalize_name)
+        computed_field(:display_name, :string, :create_display_name)
       end
 
       def normalize_name(data) do
@@ -485,8 +498,10 @@ defmodule Elixact.Phase3TestRunner do
 
     data = %{name: "  John  "}
     assert {:ok, result} = ModelValidatorIntegrationTest.validate(data)
-    assert result.name == "John"  # normalized by model validator
-    assert result.display_name == "Mr. John"  # computed from normalized data
+    # normalized by model validator
+    assert result.name == "John"
+    # computed from normalized data
+    assert result.display_name == "Mr. John"
 
     :ok
   end
@@ -496,8 +511,8 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :value, :integer, required: true
-        computed_field :doubled_value, :integer, :double_value
+        field(:value, :integer, required: true)
+        computed_field(:doubled_value, :integer, :double_value)
       end
 
       def double_value(data) do
@@ -521,8 +536,8 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :input, :string, required: true
-        computed_field :processed, :string, :process_input
+        field(:input, :string, required: true)
+        computed_field(:processed, :string, :process_input)
       end
 
       def process_input(data) do
@@ -533,7 +548,11 @@ defmodule Elixact.Phase3TestRunner do
     config = Elixact.Config.create(strict: true, coercion: :safe)
     data = %{input: "hello"}
 
-    assert {:ok, result} = Elixact.EnhancedValidator.validate(EnhancedValidatorIntegrationTest, data, config: config)
+    assert {:ok, result} =
+             Elixact.EnhancedValidator.validate(EnhancedValidatorIntegrationTest, data,
+               config: config
+             )
+
     assert result.input == "hello"
     assert result.processed == "HELLO"
 
@@ -545,8 +564,8 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact
 
       schema do
-        field :name, :string, required: true
-        computed_field :greeting, :string, :create_greeting
+        field(:name, :string, required: true)
+        computed_field(:greeting, :string, :create_greeting)
       end
 
       def create_greeting(_data), do: {:ok, "Hello!"}
@@ -575,8 +594,8 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :numbers, {:array, :integer}, required: true
-        computed_field :statistics, {:map, {:string, :float}}, :calculate_stats
+        field(:numbers, {:array, :integer}, required: true)
+        computed_field(:statistics, {:map, {:string, :float}}, :calculate_stats)
       end
 
       def calculate_stats(data) do
@@ -590,13 +609,14 @@ defmodule Elixact.Phase3TestRunner do
           "sum" => sum * 1.0,
           "average" => avg
         }
+
         {:ok, stats}
       end
     end
 
     data = %{numbers: [1, 2, 3, 4, 5]}
     assert {:ok, result} = ComplexTypeIntegrationTest.validate(data)
-    
+
     assert result.numbers == [1, 2, 3, 4, 5]
     assert is_map(result.statistics)
     assert result.statistics["count"] == 5.0
@@ -611,10 +631,10 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :name, :string, required: true
-        field :data, {:array, :integer}, required: true
-        computed_field :data_sum, :integer, :sum_data
-        computed_field :data_count, :integer, :count_data
+        field(:name, :string, required: true)
+        field(:data, {:array, :integer}, required: true)
+        computed_field(:data_sum, :integer, :sum_data)
+        computed_field(:data_count, :integer, :count_data)
       end
 
       def sum_data(data) do
@@ -646,12 +666,12 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact
 
       schema do
-        field :field1, :string, required: true
-        field :field2, :integer, required: true
-        field :field3, {:array, :string}, required: false
-        computed_field :computed1, :string, :compute1
-        computed_field :computed2, :integer, :compute2
-        computed_field :computed3, {:map, {:string, :any}}, :compute3
+        field(:field1, :string, required: true)
+        field(:field2, :integer, required: true)
+        field(:field3, {:array, :string}, required: false)
+        computed_field(:computed1, :string, :compute1)
+        computed_field(:computed2, :integer, :compute2)
+        computed_field(:computed3, {:map, {:string, :any}}, :compute3)
       end
 
       def compute1(_), do: {:ok, "test"}
@@ -678,8 +698,8 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :data, :string, required: true
-        computed_field :processed, :string, :process
+        field(:data, :string, required: true)
+        computed_field(:processed, :string, :process)
       end
 
       def process(data) do
@@ -710,7 +730,7 @@ defmodule Elixact.Phase3TestRunner do
   def run_specific_tests(test_categories) when is_list(test_categories) do
     IO.puts("\n🎯 Running Specific Tests: #{inspect(test_categories)}\n")
 
-    results = 
+    results =
       test_categories
       |> Enum.map(fn category ->
         case category do
@@ -739,8 +759,8 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :name, :string, required: true
-        computed_field :greeting, :string, :create_greeting
+        field(:name, :string, required: true)
+        computed_field(:greeting, :string, :create_greeting)
       end
 
       def create_greeting(data) do
@@ -761,7 +781,7 @@ defmodule Elixact.Phase3TestRunner do
       use Elixact, define_struct: true
 
       schema do
-        field :name, :string, required: true
+        field(:name, :string, required: true)
       end
     end
 

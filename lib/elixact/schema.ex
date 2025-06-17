@@ -387,11 +387,17 @@ defmodule Elixact.Schema do
     default_value = Keyword.get(opts_without_do, :default)
 
     # Determine if field is required (required: true takes precedence over optional: true)
+    # Fields with default values should be optional unless explicitly marked as required
     is_required =
       if Keyword.has_key?(opts_without_do, :required) do
         required
       else
-        not optional
+        # If a default value is provided, the field should be optional unless explicitly required
+        if default_value != nil do
+          false
+        else
+          not optional
+        end
       end
 
     quote do
@@ -613,6 +619,7 @@ defmodule Elixact.Schema do
 
   ## Examples
 
+      # Define a schema with computed fields
       defmodule UserSchema do
         use Elixact, define_struct: true
 
@@ -626,19 +633,20 @@ defmodule Elixact.Schema do
           computed_field :initials, :string, :create_initials
         end
 
-        def generate_full_name(data) do
-          {:ok, "#{data.first_name} #{data.last_name}"}
+        # Computed field functions
+        def generate_full_name(input) do
+          {:ok, "\#{input.first_name} \#{input.last_name}"}
         end
 
-        def extract_email_domain(data) do
-          domain = data.email |> String.split("@") |> List.last()
+        def extract_email_domain(input) do
+          domain = input.email |> String.split("@") |> List.last()
           {:ok, domain}
         end
 
-        def create_initials(data) do
-          first_initial = String.first(data.first_name)
-          last_initial = String.first(data.last_name)
-          {:ok, "#{first_initial}#{last_initial}"}
+        def create_initials(input) do
+          first_initial = String.first(input.first_name)
+          last_initial = String.first(input.last_name)
+          {:ok, "\#{first_initial}\#{last_initial}"}
         end
       end
 
@@ -651,7 +659,7 @@ defmodule Elixact.Schema do
 
       # Result includes computed fields
       # user.full_name => "John Doe"
-      # user.email_domain => "example.com"
+      # user.email_domain => "example.com" 
       # user.initials => "JD"
 
   ## Error Handling
@@ -697,16 +705,18 @@ defmodule Elixact.Schema do
   """
   @spec computed_field(atom(), term(), atom()) :: Macro.t()
   defmacro computed_field(name, type, function_name)
-      when is_atom(name) and is_atom(function_name) do
+           when is_atom(name) and is_atom(function_name) do
     quote do
       # Validate that the field name is a valid atom
       unless is_atom(unquote(name)) and not is_nil(unquote(name)) do
-        raise ArgumentError, "computed field name must be a non-nil atom, got: #{inspect(unquote(name))}"
+        raise ArgumentError,
+              "computed field name must be a non-nil atom, got: #{inspect(unquote(name))}"
       end
 
       # Validate that the function name is a valid atom
       unless is_atom(unquote(function_name)) and not is_nil(unquote(function_name)) do
-        raise ArgumentError, "computed field function name must be a non-nil atom, got: #{inspect(unquote(function_name))}"
+        raise ArgumentError,
+              "computed field function name must be a non-nil atom, got: #{inspect(unquote(function_name))}"
       end
 
       # Create computed field metadata
@@ -752,18 +762,20 @@ defmodule Elixact.Schema do
   """
   @spec computed_field(atom(), term(), atom(), keyword()) :: Macro.t()
   defmacro computed_field(name, type, function_name, opts)
-      when is_atom(name) and is_atom(function_name) and is_list(opts) do
+           when is_atom(name) and is_atom(function_name) and is_list(opts) do
     description = Keyword.get(opts, :description)
     example = Keyword.get(opts, :example)
 
     quote do
       # Validate inputs
       unless is_atom(unquote(name)) and not is_nil(unquote(name)) do
-        raise ArgumentError, "computed field name must be a non-nil atom, got: #{inspect(unquote(name))}"
+        raise ArgumentError,
+              "computed field name must be a non-nil atom, got: #{inspect(unquote(name))}"
       end
 
       unless is_atom(unquote(function_name)) and not is_nil(unquote(function_name)) do
-        raise ArgumentError, "computed field function name must be a non-nil atom, got: #{inspect(unquote(function_name))}"
+        raise ArgumentError,
+              "computed field function name must be a non-nil atom, got: #{inspect(unquote(function_name))}"
       end
 
       # Create computed field metadata with additional options
@@ -778,100 +790,6 @@ defmodule Elixact.Schema do
       }
 
       # Store the computed field metadata
-      @computed_fields {unquote(name), computed_field_meta}
-    end
-  end
-
-  # Add helper macros for computed field metadata within the computed_field block context
-
-  @doc """
-  Sets a description for the computed field.
-
-  This macro should be used within a computed_field block to provide
-  documentation for the computed field.
-
-  ## Parameters
-    * `text` - String description of the computed field's purpose
-
-  ## Examples
-
-      computed_field :display_name, :string, :create_display_name do
-        computed_description("User's display name for UI components")
-      end
-  """
-  @spec computed_description(String.t()) :: Macro.t()
-  defmacro computed_description(text) do
-    quote do
-      var!(computed_field_meta) =
-        Elixact.ComputedFieldMeta.with_description(var!(computed_field_meta), unquote(text))
-    end
-  end
-
-  @doc """
-  Sets an example value for the computed field.
-
-  This macro should be used within a computed_field block to provide
-  an example value for documentation and testing.
-
-  ## Parameters
-    * `value` - Example value that the computed field might return
-
-  ## Examples
-
-      computed_field :age_category, :string, :categorize_age do
-        computed_example("adult")
-      end
-  """
-  @spec computed_example(term()) :: Macro.t()
-  defmacro computed_example(value) do
-    quote do
-      var!(computed_field_meta) =
-        Elixact.ComputedFieldMeta.with_example(var!(computed_field_meta), unquote(value))
-    end
-  end
-
-  @doc """
-  Alternative syntax for computed fields with a do block for metadata.
-
-  This provides a more structured way to define computed fields with metadata,
-  similar to how regular fields work.
-
-  ## Examples
-
-      computed_field :user_summary, :string, :generate_user_summary do
-        computed_description("A summary of the user's profile information")
-        computed_example("John Doe (john@example.com) - Software Engineer")
-      end
-  """
-  @spec computed_field(atom(), term(), atom(), keyword()) :: Macro.t()
-  defmacro computed_field(name, type, function_name, do: block)
-      when is_atom(name) and is_atom(function_name) do
-    quote do
-      # Validate inputs
-      unless is_atom(unquote(name)) and not is_nil(unquote(name)) do
-        raise ArgumentError, "computed field name must be a non-nil atom, got: #{inspect(unquote(name))}"
-      end
-
-      unless is_atom(unquote(function_name)) and not is_nil(unquote(function_name)) do
-        raise ArgumentError, "computed field function name must be a non-nil atom, got: #{inspect(unquote(function_name))}"
-      end
-
-      # Create base computed field metadata
-      computed_field_meta = %Elixact.ComputedFieldMeta{
-        name: unquote(name),
-        type: unquote(handle_type(type)),
-        function_name: unquote(function_name),
-        module: __MODULE__,
-        readonly: true
-      }
-
-      # Create a variable accessible within the block for metadata updates
-      var!(computed_field_meta) = computed_field_meta
-
-      # Execute the block to apply metadata
-      unquote(block)
-
-      # Store the final computed field metadata
       @computed_fields {unquote(name), computed_field_meta}
     end
   end
@@ -1089,9 +1007,9 @@ defmodule Elixact.Schema do
           model_validator :validate_passwords_match
         end
 
-        def validate_passwords_match(data) do
-          if data.password == data.password_confirmation do
-            {:ok, data}
+        def validate_passwords_match(input) do
+          if input.password == input.password_confirmation do
+            {:ok, input}
           else
             {:error, "passwords do not match"}
           end
@@ -1113,8 +1031,8 @@ defmodule Elixact.Schema do
   ## Data Transformation
   Model validators can transform the data by returning modified data:
 
-      def normalize_email(data) do
-        normalized = %{data | email: String.downcase(data.email)}
+      def normalize_email(input) do
+        normalized = %{input | email: String.downcase(input.email)}
         {:ok, normalized}
       end
   """

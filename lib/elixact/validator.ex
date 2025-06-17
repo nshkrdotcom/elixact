@@ -52,6 +52,17 @@ defmodule Elixact.Validator do
     end
   end
 
+  # Helper function to check if a schema has computed fields
+  @spec has_computed_fields?(module()) :: boolean()
+  defp has_computed_fields?(schema) do
+    if function_exported?(schema, :__schema__, 1) do
+      computed_fields = schema.__schema__(:computed_fields) || []
+      length(computed_fields) > 0
+    else
+      false
+    end
+  end
+
   @spec validate_required_fields([{atom(), Elixact.FieldMeta.t()}], map(), validation_path()) ::
           :ok | {:error, Error.t()}
   defp validate_required_fields(fields, data, path) do
@@ -132,7 +143,28 @@ defmodule Elixact.Validator do
   def validate(type, value), do: do_validate(type, value, [])
 
   defp do_validate({:ref, schema}, value, path) when is_atom(schema) do
-    validate_schema(schema, value, path)
+    # Check if schema has computed fields and use appropriate validation
+    if has_computed_fields?(schema) do
+      # Use StructValidator for schemas with computed fields
+      case Elixact.StructValidator.validate_schema(schema, value, path) do
+        {:ok, validated} when is_struct(validated) ->
+          # Convert struct back to map for consistency with validator expectations
+          {:ok, Map.from_struct(validated)}
+
+        {:ok, validated} when is_map(validated) ->
+          {:ok, validated}
+
+        {:error, errors} when is_list(errors) ->
+          # Convert single-error lists to single errors for compatibility
+          case errors do
+            [single_error] -> {:error, single_error}
+            multiple_errors -> {:error, multiple_errors}
+          end
+      end
+    else
+      # Use basic field validation for schemas without computed fields
+      validate_schema(schema, value, path)
+    end
   end
 
   defp do_validate(schema, value, path) when is_atom(schema) do

@@ -63,21 +63,21 @@ defmodule Elixact.StructValidator do
           computed_field :email_domain, :string, :extract_email_domain
         end
 
-        def normalize_names(data) do
+        def normalize_names(validated_data) do
           normalized = %{
-            data |
-            first_name: String.trim(data.first_name),
-            last_name: String.trim(data.last_name)
+            validated_data |
+            first_name: String.trim(validated_data.first_name),
+            last_name: String.trim(validated_data.last_name)
           }
           {:ok, normalized}
         end
 
-        def generate_full_name(data) do
-          {:ok, "#{data.first_name} #{data.last_name}"}
+        def generate_full_name(validated_data) do
+          {:ok, "\#{validated_data.first_name} \#{validated_data.last_name}"}
         end
 
-        def extract_email_domain(data) do
-          {:ok, data.email |> String.split("@") |> List.last()}
+        def extract_email_domain(validated_data) do
+          {:ok, validated_data.email |> String.split("@") |> List.last()}
         end
       end
 
@@ -109,7 +109,7 @@ defmodule Elixact.StructValidator do
           {:ok, map() | struct()} | {:error, [Error.t()]}
   def validate_schema(schema_module, data, path \\ []) when is_atom(schema_module) do
     # Step 1: Field validation (existing logic)
-    case Validator.validate_schema(schema_module, data, path) do
+    case validate_schema_fields_only(schema_module, data, path) do
       {:ok, validated_map} ->
         # Step 2: Model validation (Phase 2)
         case apply_model_validators(schema_module, validated_map, path) do
@@ -133,6 +133,124 @@ defmodule Elixact.StructValidator do
         {:error, errors}
     end
   end
+
+  # Validate only the schema fields without computed fields or struct creation
+  @spec validate_schema_fields_only(module(), map(), [atom() | String.t() | integer()]) ::
+          {:ok, map()} | {:error, [Error.t()]}
+  defp validate_schema_fields_only(schema_module, data, path) do
+    # Schema validation only works with maps
+    if is_map(data) do
+      fields = schema_module.__schema__(:fields)
+      config = schema_module.__schema__(:config) || %{}
+
+      with :ok <- validate_required_fields_only(fields, data, path),
+           {:ok, validated} <- validate_fields_only(fields, data, path),
+           :ok <- validate_strict_mode_only(config, validated, data, path) do
+        {:ok, validated}
+      end
+    else
+      error = Error.new(path, :type, "expected map for schema validation, got #{inspect(data)}")
+      {:error, [error]}
+    end
+  end
+
+  # Field validation helpers (duplicated from Validator to avoid circular dependencies)
+  @spec validate_required_fields_only([{atom(), Elixact.FieldMeta.t()}], map(), [
+          atom() | String.t() | integer()
+        ]) ::
+          :ok | {:error, [Error.t()]}
+  defp validate_required_fields_only(fields, data, path) do
+    required_fields = for {name, meta} <- fields, meta.required, do: name
+
+    case Enum.find(required_fields, fn field ->
+           not Map.has_key?(data, field) and not Map.has_key?(data, Atom.to_string(field))
+         end) do
+      nil ->
+        :ok
+
+      missing_field ->
+        error = Error.new(path ++ [missing_field], :required, "field is required")
+        {:error, [error]}
+    end
+  end
+
+  @spec validate_fields_only([{atom(), Elixact.FieldMeta.t()}], map(), [
+          atom() | String.t() | integer()
+        ]) ::
+          {:ok, map()} | {:error, [Error.t()]}
+  defp validate_fields_only(fields, data, path) do
+    results =
+      Enum.map(fields, fn {name, meta} ->
+        field_path = path ++ [name]
+
+        case extract_field_value(data, name) do
+          {:ok, value} ->
+            case Validator.validate(meta.type, value, field_path) do
+              {:ok, validated} -> {name, {:ok, validated}}
+              {:error, error} -> {name, {:error, error}}
+            end
+
+          {:error, :missing} when not meta.required ->
+            case meta.default do
+              nil -> {name, :skip}
+              default -> {name, {:ok, default}}
+            end
+
+          {:error, :missing} ->
+            error = Error.new(field_path, :required, "field is required")
+            {name, {:error, error}}
+        end
+      end)
+
+    errors =
+      results
+      |> Enum.filter(fn {_name, result} -> match?({:error, _}, result) end)
+      |> Enum.map(fn {_name, {:error, error}} -> error end)
+
+    case errors do
+      [] ->
+        validated =
+          results
+          |> Enum.reject(fn {_name, result} -> result == :skip end)
+          |> Enum.map(fn {name, {:ok, value}} -> {name, value} end)
+          |> Map.new()
+
+        {:ok, validated}
+
+      errors ->
+        {:error, errors}
+    end
+  end
+
+  @spec extract_field_value(map(), atom()) :: {:ok, term()} | {:error, :missing}
+  defp extract_field_value(data, field_name) do
+    cond do
+      Map.has_key?(data, field_name) ->
+        {:ok, Map.get(data, field_name)}
+
+      Map.has_key?(data, Atom.to_string(field_name)) ->
+        {:ok, Map.get(data, Atom.to_string(field_name))}
+
+      true ->
+        {:error, :missing}
+    end
+  end
+
+  @spec validate_strict_mode_only(map(), map(), map(), [atom() | String.t() | integer()]) ::
+          :ok | {:error, [Error.t()]}
+  defp validate_strict_mode_only(%{strict: true}, validated, original, path) do
+    extra_keys = Map.keys(original) -- Map.keys(validated)
+
+    if extra_keys == [] do
+      :ok
+    else
+      # Use the same error format as the original validator
+      error = Error.new(path, :additional_properties, "unknown fields: #{inspect(extra_keys)}")
+      {:error, [error]}
+    end
+  end
+
+  defp validate_strict_mode_only(_, _, _, _), do: :ok
 
   # Apply model validators in sequence
   @spec apply_model_validators(module(), map(), [atom() | String.t() | integer()]) ::
@@ -248,7 +366,10 @@ defmodule Elixact.StructValidator do
     e in ArgumentError ->
       # Get field information for better error messages
       regular_fields = get_struct_fields(schema_module)
-      computed_fields = get_computed_fields(schema_module) |> Enum.map(fn {name, _meta} -> name end)
+
+      computed_fields =
+        get_computed_fields(schema_module) |> Enum.map(fn {name, _meta} -> name end)
+
       all_expected_fields = regular_fields ++ computed_fields
 
       error_message = """
@@ -295,6 +416,7 @@ defmodule Elixact.StructValidator do
           {:ok, computed_value} ->
             # Validate the computed value against its declared type
             field_path = path ++ [field_name]
+
             case validate_computed_value(computed_field_meta, computed_value, field_path) do
               {:ok, validated_computed_value} ->
                 updated_data = Map.put(current_data, field_name, validated_computed_value)
@@ -314,65 +436,79 @@ defmodule Elixact.StructValidator do
   @spec get_computed_fields(module()) :: [{atom(), Elixact.ComputedFieldMeta.t()}]
   defp get_computed_fields(schema_module) do
     if function_exported?(schema_module, :__schema__, 1) do
-      schema_module.__schema__(:computed_fields) || []
+      # Reverse the list to process computed fields in the order they were defined
+      (schema_module.__schema__(:computed_fields) || []) |> Enum.reverse()
     else
       []
     end
   end
 
   # Execute a single computed field with comprehensive error handling
-  @spec execute_computed_field(Elixact.ComputedFieldMeta.t(), map(), [atom() | String.t() | integer()]) ::
+  @spec execute_computed_field(Elixact.ComputedFieldMeta.t(), map(), [
+          atom() | String.t() | integer()
+        ]) ::
           {:ok, term()} | {:error, [Error.t()]}
   defp execute_computed_field(computed_field_meta, data, path) do
     field_path = path ++ [computed_field_meta.name]
 
-    case apply(computed_field_meta.module, computed_field_meta.function_name, [data]) do
-      {:ok, computed_value} ->
-        {:ok, computed_value}
+    try do
+      case apply(computed_field_meta.module, computed_field_meta.function_name, [data]) do
+        {:ok, computed_value} ->
+          {:ok, computed_value}
 
-      {:error, reason} when is_binary(reason) ->
-        error = Error.new(field_path, :computed_field, reason)
+        {:error, reason} when is_binary(reason) ->
+          error = Error.new(field_path, :computed_field, reason)
+          {:error, [error]}
+
+        {:error, %Error{} = error} ->
+          # Update error path to include computed field context
+          updated_error = update_computed_field_error_path(error, field_path, computed_field_meta)
+          {:error, [updated_error]}
+
+        {:error, errors} when is_list(errors) ->
+          # Handle list of errors
+          updated_errors =
+            Enum.map(
+              errors,
+              &update_computed_field_error_path(&1, field_path, computed_field_meta)
+            )
+
+          {:error, updated_errors}
+
+        other ->
+          # Invalid return format from computed field function
+          function_ref = Elixact.ComputedFieldMeta.function_reference(computed_field_meta)
+
+          error_msg =
+            "Computed field function #{function_ref} returned invalid format: #{inspect(other)}. " <>
+              "Expected {:ok, value} or {:error, reason}"
+
+          error = Error.new(field_path, :computed_field, error_msg)
+          {:error, [error]}
+      end
+    rescue
+      _e in UndefinedFunctionError ->
+        function_ref = Elixact.ComputedFieldMeta.function_reference(computed_field_meta)
+        error_msg = "Computed field function #{function_ref} is not defined"
+        error = Error.new(field_path, :computed_field, error_msg)
         {:error, [error]}
 
-      {:error, %Error{} = error} ->
-        # Update error path to include computed field context
-        updated_error = update_computed_field_error_path(error, field_path, computed_field_meta)
-        {:error, [updated_error]}
-
-      {:error, errors} when is_list(errors) ->
-        # Handle list of errors
-        updated_errors = Enum.map(errors, &update_computed_field_error_path(&1, field_path, computed_field_meta))
-        {:error, updated_errors}
-
-      other ->
-        # Invalid return format from computed field function
+      e ->
+        # Catch any other exceptions during computed field execution
         function_ref = Elixact.ComputedFieldMeta.function_reference(computed_field_meta)
+
         error_msg =
-          "Computed field function #{function_ref} returned invalid format: #{inspect(other)}. " <>
-          "Expected {:ok, value} or {:error, reason}"
+          "Computed field function #{function_ref} execution failed: #{Exception.message(e)}"
 
         error = Error.new(field_path, :computed_field, error_msg)
         {:error, [error]}
     end
-  rescue
-    _e in UndefinedFunctionError ->
-      function_ref = Elixact.ComputedFieldMeta.function_reference(computed_field_meta)
-      error_msg = "Computed field function #{function_ref} is not defined"
-      error = Error.new(field_path, :computed_field, error_msg)
-      {:error, [error]}
-
-    e ->
-      # Catch any other exceptions during computed field execution
-      function_ref = Elixact.ComputedFieldMeta.function_reference(computed_field_meta)
-      error_msg =
-        "Computed field function #{function_ref} execution failed: #{Exception.message(e)}"
-
-      error = Error.new(field_path, :computed_field, error_msg)
-      {:error, [error]}
   end
 
   # Validate computed field return value against its declared type
-  @spec validate_computed_value(Elixact.ComputedFieldMeta.t(), term(), [atom() | String.t() | integer()]) ::
+  @spec validate_computed_value(Elixact.ComputedFieldMeta.t(), term(), [
+          atom() | String.t() | integer()
+        ]) ::
           {:ok, term()} | {:error, [Error.t()]}
   defp validate_computed_value(computed_field_meta, computed_value, field_path) do
     case Elixact.Validator.validate(computed_field_meta.type, computed_value, field_path) do
@@ -385,26 +521,38 @@ defmodule Elixact.StructValidator do
           Enum.map(errors, fn error ->
             enhanced_message =
               "Computed field type validation failed: #{error.message} " <>
-              "(from #{Elixact.ComputedFieldMeta.function_reference(computed_field_meta)})"
+                "(from #{Elixact.ComputedFieldMeta.function_reference(computed_field_meta)})"
+
             %{error | message: enhanced_message, code: :computed_field_type}
           end)
+
         {:error, contextualized_errors}
 
       {:error, error} ->
         # Single error case
         enhanced_message =
           "Computed field type validation failed: #{error.message} " <>
-          "(from #{Elixact.ComputedFieldMeta.function_reference(computed_field_meta)})"
+            "(from #{Elixact.ComputedFieldMeta.function_reference(computed_field_meta)})"
+
         enhanced_error = %{error | message: enhanced_message, code: :computed_field_type}
         {:error, [enhanced_error]}
     end
   end
 
   # Update error path to include computed field context
-  @spec update_computed_field_error_path(Error.t(), [atom() | String.t() | integer()], Elixact.ComputedFieldMeta.t()) :: Error.t()
-  defp update_computed_field_error_path(%Error{path: error_path} = error, field_path, computed_field_meta) do
+  @spec update_computed_field_error_path(
+          Error.t(),
+          [atom() | String.t() | integer()],
+          Elixact.ComputedFieldMeta.t()
+        ) :: Error.t()
+  defp update_computed_field_error_path(
+         %Error{path: error_path} = error,
+         field_path,
+         computed_field_meta
+       ) do
     # Enhance error message to include computed field context
     function_ref = Elixact.ComputedFieldMeta.function_reference(computed_field_meta)
+
     enhanced_message =
       if String.contains?(error.message, function_ref) do
         error.message

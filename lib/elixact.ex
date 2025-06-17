@@ -285,12 +285,12 @@ defmodule Elixact do
               computed_field :email_domain, :string, :extract_email_domain
             end
 
-            def generate_full_name(data) do
-              {:ok, "#{data.first_name} #{data.last_name}"}
+            def generate_full_name(input) do
+              {:ok, "\#{input.first_name} \#{input.last_name}"}
             end
 
-            def extract_email_domain(data) do
-              {:ok, data.email |> String.split("@") |> List.last()}
+            def extract_email_domain(input) do
+              {:ok, input.email |> String.split("@") |> List.last()}
             end
           end
 

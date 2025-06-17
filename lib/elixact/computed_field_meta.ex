@@ -39,12 +39,12 @@ defmodule Elixact.ComputedFieldMeta do
 
   ## Examples
 
-      iex> Elixact.ComputedFieldMeta.new(:full_name, {:type, :string, []}, :generate_full_name, MySchema)
+      iex> Elixact.ComputedFieldMeta.new(:uppercased, {:type, :string, []}, :upcase, String)
       %Elixact.ComputedFieldMeta{
-        name: :full_name,
+        name: :uppercased,
         type: {:type, :string, []},
-        function_name: :generate_full_name,
-        module: MySchema,
+        function_name: :upcase,
+        module: String,
         readonly: true
       }
   """
@@ -68,12 +68,14 @@ defmodule Elixact.ComputedFieldMeta do
 
   ## Examples
 
-      iex> meta = Elixact.ComputedFieldMeta.new(:full_name, {:type, :string, []}, :generate_full_name, MySchema)
-      iex> Elixact.ComputedFieldMeta.with_description(meta, "User's full name")
-      %Elixact.ComputedFieldMeta{description: "User's full name", ...}
+      iex> meta = Elixact.ComputedFieldMeta.new(:uppercased, {:type, :string, []}, :upcase, String)
+      iex> updated = Elixact.ComputedFieldMeta.with_description(meta, "Uppercased version")
+      iex> updated.description
+      "Uppercased version"
   """
   @spec with_description(t(), String.t()) :: t()
-  def with_description(%__MODULE__{} = computed_field_meta, description) when is_binary(description) do
+  def with_description(%__MODULE__{} = computed_field_meta, description)
+      when is_binary(description) do
     %{computed_field_meta | description: description}
   end
 
@@ -86,9 +88,10 @@ defmodule Elixact.ComputedFieldMeta do
 
   ## Examples
 
-      iex> meta = Elixact.ComputedFieldMeta.new(:full_name, {:type, :string, []}, :generate_full_name, MySchema)
-      iex> Elixact.ComputedFieldMeta.with_example(meta, "John Doe")
-      %Elixact.ComputedFieldMeta{example: "John Doe", ...}
+      iex> meta = Elixact.ComputedFieldMeta.new(:uppercased, {:type, :string, []}, :upcase, String)
+      iex> updated = Elixact.ComputedFieldMeta.with_example(meta, "HELLO")
+      iex> updated.example
+      "HELLO"
   """
   @spec with_example(t(), term()) :: t()
   def with_example(%__MODULE__{} = computed_field_meta, example) do
@@ -107,9 +110,10 @@ defmodule Elixact.ComputedFieldMeta do
 
   ## Examples
 
-      iex> meta = Elixact.ComputedFieldMeta.new(:full_name, {:type, :string, []}, :generate_full_name, MySchema)
-      iex> Elixact.ComputedFieldMeta.set_readonly(meta, false)
-      %Elixact.ComputedFieldMeta{readonly: false, ...}
+      iex> meta = Elixact.ComputedFieldMeta.new(:uppercased, {:type, :string, []}, :upcase, String)
+      iex> updated = Elixact.ComputedFieldMeta.set_readonly(meta, false)
+      iex> updated.readonly
+      false
   """
   @spec set_readonly(t(), boolean()) :: t()
   def set_readonly(%__MODULE__{} = computed_field_meta, readonly) when is_boolean(readonly) do
@@ -128,20 +132,23 @@ defmodule Elixact.ComputedFieldMeta do
 
   ## Examples
 
-      iex> meta = Elixact.ComputedFieldMeta.new(:full_name, {:type, :string, []}, :generate_full_name, MySchema)
+      # For a module that exists with the function
+      iex> meta = Elixact.ComputedFieldMeta.new(:result, {:type, :string, []}, :upcase, String)
       iex> Elixact.ComputedFieldMeta.validate_function(meta)
-      :ok  # assuming MySchema.generate_full_name/1 exists
+      :ok
 
-      iex> meta = Elixact.ComputedFieldMeta.new(:bad_field, {:type, :string, []}, :missing_function, MySchema)
+      # For a module with a missing function
+      iex> meta = Elixact.ComputedFieldMeta.new(:bad_field, {:type, :string, []}, :missing_function, String)
       iex> Elixact.ComputedFieldMeta.validate_function(meta)
-      {:error, "Function MySchema.missing_function/1 is not defined"}
+      {:error, "Function String.missing_function/1 is not defined"}
   """
   @spec validate_function(t()) :: :ok | {:error, String.t()}
   def validate_function(%__MODULE__{} = computed_field_meta) do
     if function_exported?(computed_field_meta.module, computed_field_meta.function_name, 1) do
       :ok
     else
-      {:error, "Function #{computed_field_meta.module}.#{computed_field_meta.function_name}/1 is not defined"}
+      function_ref = function_reference(computed_field_meta)
+      {:error, "Function #{function_ref} is not defined"}
     end
   end
 
@@ -156,13 +163,16 @@ defmodule Elixact.ComputedFieldMeta do
 
   ## Examples
 
-      iex> meta = Elixact.ComputedFieldMeta.new(:full_name, {:type, :string, []}, :generate_full_name, MySchema)
+      iex> meta = Elixact.ComputedFieldMeta.new(:uppercased, {:type, :string, []}, :upcase, String)
       iex> Elixact.ComputedFieldMeta.function_reference(meta)
-      "MySchema.generate_full_name/1"
+      "String.upcase/1"
   """
   @spec function_reference(t()) :: String.t()
   def function_reference(%__MODULE__{} = computed_field_meta) do
-    "#{computed_field_meta.module}.#{computed_field_meta.function_name}/1"
+    module_name =
+      computed_field_meta.module |> to_string() |> String.replace_prefix("Elixir.", "")
+
+    "#{module_name}.#{computed_field_meta.function_name}/1"
   end
 
   @doc """
@@ -176,21 +186,30 @@ defmodule Elixact.ComputedFieldMeta do
 
   ## Examples
 
-      iex> meta = Elixact.ComputedFieldMeta.new(:full_name, {:type, :string, []}, :generate_full_name, MySchema)
-      iex> |> Elixact.ComputedFieldMeta.with_description("User's full name")
+      iex> meta = Elixact.ComputedFieldMeta.new(:uppercased, {:type, :string, []}, :upcase, String)
+      iex> |> Elixact.ComputedFieldMeta.with_description("Uppercased version")
       iex> Elixact.ComputedFieldMeta.to_map(meta)
       %{
-        name: :full_name,
+        name: :uppercased,
         type: {:type, :string, []},
-        function_name: :generate_full_name,
-        module: MySchema,
-        description: "User's full name",
+        function_name: :upcase,
+        module: String,
+        description: "Uppercased version",
         example: nil,
         readonly: true,
-        function_reference: "MySchema.generate_full_name/1"
+        function_reference: "String.upcase/1"
       }
   """
-  @spec to_map(t()) :: map()
+  @spec to_map(t()) :: %{
+          name: atom(),
+          type: Elixact.Types.type_definition(),
+          function_name: atom(),
+          module: module(),
+          description: String.t() | nil,
+          example: term() | nil,
+          readonly: boolean(),
+          function_reference: String.t()
+        }
   def to_map(%__MODULE__{} = computed_field_meta) do
     %{
       name: computed_field_meta.name,

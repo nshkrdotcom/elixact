@@ -75,7 +75,7 @@ defmodule Elixact.Phase3Example do
 
     # Computed field functions
     def generate_full_name(data) do
-      {:ok, "#{data.first_name} #{data.last_name}"}
+      {:ok, data.first_name <> " " <> data.last_name}
     end
 
     def extract_email_domain(data) do
@@ -84,8 +84,8 @@ defmodule Elixact.Phase3Example do
     end
 
     def create_profile_summary(data) do
-      bio_part = if data.bio, do: " - #{String.slice(data.bio, 0, 50)}...", else: ""
-      summary = "#{data.first_name} #{data.last_name} (#{data.email})#{bio_part}"
+      bio_part = if data.bio, do: " - " <> String.slice(data.bio, 0, 50) <> "...", else: ""
+      summary = data.first_name <> " " <> data.last_name <> " (" <> data.email <> ")" <> bio_part
       {:ok, summary}
     end
 
@@ -108,7 +108,7 @@ defmodule Elixact.Phase3Example do
     def generate_initials(data) do
       first_initial = String.first(data.first_name) |> String.upcase()
       last_initial = String.first(data.last_name) |> String.upcase()
-      {:ok, "#{first_initial}#{last_initial}"}
+      {:ok, first_initial <> last_initial}
     end
   end
 
