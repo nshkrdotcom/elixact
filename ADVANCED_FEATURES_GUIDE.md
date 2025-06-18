@@ -1161,3 +1161,22 @@ end
    - Choose the right validation approach for your use case
 
 This guide covers the advanced features that make Elixact suitable for complex validation scenarios, from simple business logic to sophisticated AI/LLM integration patterns.
+
+## 📚 Practical Examples
+
+For hands-on examples of all the patterns covered in this guide, see the [`examples/`](../examples/) directory:
+
+- **Advanced Features**: [`advanced_features.exs`](../examples/advanced_features.exs)
+- **Model Validators**: [`model_validators.exs`](../examples/model_validators.exs)
+- **Computed Fields**: [`computed_fields.exs`](../examples/computed_fields.exs)
+- **Enhanced Validator**: [`enhanced_validator.exs`](../examples/enhanced_validator.exs)
+- **Advanced Configuration**: [`advanced_config.exs`](../examples/advanced_config.exs)
+- **Conditional & Recursive Validation**: [`conditional_recursive_validation.exs`](../examples/conditional_recursive_validation.exs)
+- **Root Schema**: [`root_schema.exs`](../examples/root_schema.exs)
+
+Run any example with:
+```bash
+mix run examples/<example_name>.exs
+```
+
+See [`examples/README.md`](../examples/README.md) for the complete guide.

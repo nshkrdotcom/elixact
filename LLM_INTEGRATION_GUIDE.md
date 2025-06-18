@@ -2194,4 +2194,24 @@ Key benefits of using Elixact for LLM integration:
 
 Whether you're building simple LLM-powered applications or complex multi-agent systems, Elixact provides the validation and schema management tools needed for reliable, production-ready AI applications.
 
+## 📚 Practical Examples
+
+For hands-on examples of all the LLM integration patterns covered in this guide, see the [`examples/`](../examples/) directory:
+
+- **LLM Integration Basics**: [`llm_integration.exs`](../examples/llm_integration.exs)
+- **DSPy Integration**: [`dspy_integration.exs`](../examples/dspy_integration.exs)
+- **Pipeline Orchestration**: [`llm_pipeline_orchestration.exs`](../examples/llm_pipeline_orchestration.exs)
+- **Field Metadata for DSPy**: [`field_metadata_dspy.exs`](../examples/field_metadata_dspy.exs)
+- **JSON Schema for LLMs**: [`json_schema_resolver.exs`](../examples/json_schema_resolver.exs)
+- **Runtime Schema Creation**: [`runtime_schema.exs`](../examples/runtime_schema.exs)
+
+Run any example with:
+```bash
+mix run examples/<example_name>.exs
+```
+
+See [`examples/README.md`](../examples/README.md) for the complete guide with detailed explanations and learning paths.
+
+---
+
 This completes the comprehensive LLM Integration Guide, covering all the advanced patterns and use cases for integrating Elixact with Large Language Models, from basic output validation to sophisticated multi-agent coordination systems.

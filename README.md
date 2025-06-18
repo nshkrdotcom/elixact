@@ -31,7 +31,7 @@ Add `elixact` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:elixact, "~> 1.0"}
+    {:elixact, "~> 0.1.2"}
   ]
 end
 ```
@@ -644,6 +644,37 @@ api_schema = Elixact.Runtime.create_schema([
   {:method, :string, [choices: ["GET", "POST", "PUT", "DELETE"]]}
 ])
 ```
+
+## 📚 Examples
+
+The [`examples/`](examples/) directory contains comprehensive examples showcasing all of Elixact's features:
+
+### 🟢 **Getting Started**
+- [`basic_usage.exs`](examples/basic_usage.exs) - Core concepts and fundamental patterns
+- [`custom_validation.exs`](examples/custom_validation.exs) - Business logic and custom validators
+- [`advanced_features.exs`](examples/advanced_features.exs) - Complex validation patterns
+
+### 🤖 **LLM & DSPy Integration**
+- [`llm_integration.exs`](examples/llm_integration.exs) - LLM output validation
+- [`dspy_integration.exs`](examples/dspy_integration.exs) - Complete DSPy patterns
+- [`llm_pipeline_orchestration.exs`](examples/llm_pipeline_orchestration.exs) - Multi-stage pipelines
+
+### ⚡ **Runtime Features**
+- [`runtime_schema.exs`](examples/runtime_schema.exs) - Dynamic schema creation
+- [`type_adapter.exs`](examples/type_adapter.exs) - Runtime type validation
+- [`wrapper_models.exs`](examples/wrapper_models.exs) - Single-field validation
+
+### 🔧 **Advanced Features**
+- [`model_validators.exs`](examples/model_validators.exs) - Cross-field validation
+- [`computed_fields.exs`](examples/computed_fields.exs) - Derived fields
+- [`root_schema.exs`](examples/root_schema.exs) - Non-dictionary validation
+
+**Run any example:**
+```bash
+mix run examples/basic_usage.exs
+```
+
+**See the complete guide:** [`examples/README.md`](examples/README.md)
 
 ## 🤝 Contributing
 

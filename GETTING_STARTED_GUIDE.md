@@ -9,7 +9,7 @@ Add Elixact to your `mix.exs` dependencies:
 ```elixir
 def deps do
   [
-    {:elixact, "~> 1.0"}
+    {:elixact, "~> 0.1.2"}
   ]
 end
 ```
@@ -378,11 +378,11 @@ Control validation behavior with configurations:
 
 ```elixir
 # Create custom configuration
-config = Elixact.Config.create(%{
+config = Elixact.Config.create(
   strict: true,          # No extra fields allowed
   coercion: :safe,       # Enable safe type coercion
   error_format: :detailed # Detailed error messages
-})
+)
 
 # Use configuration with validation
 {:ok, result} = Elixact.EnhancedValidator.validate(schema, data, config: config)
@@ -635,10 +635,24 @@ config = Elixact.Config.create(coercion: :safe)
 
 ## Next Steps
 
-- Read the [Advanced Features Guide](advanced_features.md) for model validators and computed fields
-- See [LLM Integration Guide](llm_integration.md) for AI/ML use cases
+### 📚 Hands-On Learning
+- **Start with Examples**: [`examples/basic_usage.exs`](examples/basic_usage.exs) - Try the fundamentals
+- **Explore Advanced Examples**: [`examples/advanced_features.exs`](examples/advanced_features.exs) - See complex patterns
+- **Complete Examples Guide**: [`examples/README.md`](examples/README.md) - Full learning path
+
+### 📖 Documentation
+- Read the [Advanced Features Guide](ADVANCED_FEATURES_GUIDE.md) for model validators and computed fields
+- See [LLM Integration Guide](LLM_INTEGRATION_GUIDE.md) for AI/ML use cases  
 - Check [API Reference](https://hexdocs.pm/elixact/) for complete documentation
-- Explore [Examples](examples/) directory for real-world patterns
+
+### 🚀 Try It Now
+```bash
+# Run your first example
+mix run examples/basic_usage.exs
+
+# See all available examples
+ls examples/*.exs
+```
 
 ## Common Issues
 
